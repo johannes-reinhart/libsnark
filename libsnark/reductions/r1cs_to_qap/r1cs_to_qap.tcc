@@ -87,6 +87,18 @@ qap_instance<FieldT> r1cs_to_qap_instance_map(const r1cs_constraint_system<Field
                                 std::move(C_in_Lagrange_basis));
 }
 
+static unsigned int roundUpToNearestPowerOf2(unsigned int v)
+{
+    v--;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    v++;
+    return v;
+}
+
 /**
  * Instance map for the R1CS-to-QAP reduction followed by evaluation of the resulting QAP instance.
  *
@@ -107,7 +119,7 @@ qap_instance_evaluation<FieldT> r1cs_to_qap_instance_map_with_evaluation(const r
 {
     libff::enter_block("Call to r1cs_to_qap_instance_map_with_evaluation");
 
-    const std::shared_ptr<libfqfft::evaluation_domain<FieldT> > domain = libfqfft::get_evaluation_domain<FieldT>(cs.num_constraints() + cs.num_inputs() + 1);
+    const std::shared_ptr<libfqfft::evaluation_domain<FieldT> > domain = libfqfft::get_evaluation_domain<FieldT>(roundUpToNearestPowerOf2(cs.num_constraints() + cs.num_inputs() + 1));
 
     std::vector<FieldT> At, Bt, Ct, Ht;
 
@@ -215,7 +227,7 @@ qap_witness<FieldT> r1cs_to_qap_witness_map(const r1cs_constraint_system<FieldT>
     /* sanity check */
     assert(cs.is_satisfied(primary_input, auxiliary_input));
 
-    const std::shared_ptr<libfqfft::evaluation_domain<FieldT> > domain = libfqfft::get_evaluation_domain<FieldT>(cs.num_constraints() + cs.num_inputs() + 1);
+    const std::shared_ptr<libfqfft::evaluation_domain<FieldT> > domain = libfqfft::get_evaluation_domain<FieldT>(roundUpToNearestPowerOf2(cs.num_constraints() + cs.num_inputs() + 1));
 
     r1cs_variable_assignment<FieldT> full_variable_assignment = primary_input;
     full_variable_assignment.insert(full_variable_assignment.end(), auxiliary_input.begin(), auxiliary_input.end());
