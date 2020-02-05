@@ -139,6 +139,10 @@ bool r1cs_constraint_system<FieldT>::is_satisfied(const r1cs_primary_input<Field
     r1cs_variable_assignment<FieldT> full_variable_assignment = primary_input;
     full_variable_assignment.insert(full_variable_assignment.end(), auxiliary_input.begin(), auxiliary_input.end());
 
+    bool bSatisified = true;
+#if defined(MULTICORE) && !defined(DEBUG)
+    #pragma omp parallel for
+#endif
     for (size_t c = 0; c < constraints.size(); ++c)
     {
         const FieldT ares = constraints[c].a.evaluate(full_variable_assignment);
@@ -155,12 +159,14 @@ bool r1cs_constraint_system<FieldT>::is_satisfied(const r1cs_primary_input<Field
             printf("<c,(1,x)> = "); cres.print();
             printf("constraint was:\n");
             dump_r1cs_constraint(constraints[c], full_variable_assignment, variable_annotations);
-#endif // DEBUG
             return false;
+#else
+            bSatisified = false;
+#endif // DEBUG
         }
     }
 
-    return true;
+    return bSatisified;
 }
 
 template<typename FieldT>
