@@ -22,6 +22,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <memory>
 
 #include <libsnark/relations/variable.hpp>
 
@@ -67,6 +68,146 @@ public:
 
     friend std::ostream& operator<< <FieldT>(std::ostream &out, const r1cs_constraint<FieldT> &c);
     friend std::istream& operator>> <FieldT>(std::istream &in, r1cs_constraint<FieldT> &c);
+};
+
+/************************* R1CS constraint (light) ***********************************/
+
+template<typename FieldT>
+class r1cs_constraint_light;
+
+template<typename T, typename... Args>
+std::unique_ptr<T> make_unique(Args&&... args) {
+    return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
+}
+
+
+template<typename FieldT>
+class IConstraint
+{
+public:
+    virtual ~IConstraint() {};
+    virtual linear_combination_light<FieldT> getA() const = 0;
+    virtual linear_combination_light<FieldT> getB() const = 0;
+    virtual linear_combination_light<FieldT> getC() const = 0;
+    virtual FieldT evaluateA(const std::vector<FieldT> &assignment) const = 0;
+    virtual FieldT evaluateB(const std::vector<FieldT> &assignment) const = 0;
+    virtual FieldT evaluateC(const std::vector<FieldT> &assignment) const = 0;
+    virtual void swapAB() = 0;
+};
+
+template<typename FieldT>
+class r1cs_constraint_light : public IConstraint<FieldT> {
+public:
+
+    r1cs_constraint_light() {};
+    r1cs_constraint_light(const linear_combination_light<FieldT> &a,
+                    const linear_combination_light<FieldT> &b,
+                    const linear_combination_light<FieldT> &c) : a(a), b(b), c(c) {};
+
+    linear_combination_light<FieldT> getA() const override
+    {
+        return a;
+    }
+
+    linear_combination_light<FieldT> getB() const override
+    {
+        return b;
+    }
+
+    linear_combination_light<FieldT> getC() const override
+    {
+        return c;
+    }
+
+    FieldT evaluateA(const std::vector<FieldT> &assignment) const override
+    {
+        return a.evaluate(assignment);
+    }
+
+    FieldT evaluateB(const std::vector<FieldT> &assignment) const override
+    {
+        return b.evaluate(assignment);
+    }
+
+    FieldT evaluateC(const std::vector<FieldT> &assignment) const override
+    {
+        return c.evaluate(assignment);
+    }
+
+    void swapAB() override
+    {
+        std::swap(a, b);
+    }
+
+    linear_combination_light<FieldT> a, b, c;
+};
+
+template<typename FieldT>
+class r1cs_constraint_light_instance : public IConstraint<FieldT> {
+public:
+
+    r1cs_constraint_light_instance(
+        const r1cs_constraint_light<FieldT>* _master,
+        ITranslator* _master_translator
+    ) : master(_master), master_translator(_master_translator)
+    {
+
+    }
+
+    linear_combination_light<FieldT> getA() const override
+    {
+        auto instance = linear_combination_light<FieldT>(master->a);
+        for (unsigned int i = 0; i < instance.terms.size(); i++)
+        {
+            instance.terms[i].index = master_translator->translate(instance.terms[i].index);
+        }
+        return instance;
+    }
+
+    linear_combination_light<FieldT> getB() const override
+    {
+        auto instance = linear_combination_light<FieldT>(master->b);
+        for (unsigned int i = 0; i < instance.terms.size(); i++)
+        {
+            instance.terms[i].index = master_translator->translate(instance.terms[i].index);
+        }
+        return instance;
+    }
+
+    linear_combination_light<FieldT> getC() const override
+    {
+        auto instance = linear_combination_light<FieldT>(master->c);
+        for (unsigned int i = 0; i < instance.terms.size(); i++)
+        {
+            instance.terms[i].index = master_translator->translate(instance.terms[i].index);
+        }
+        return instance;
+    }
+
+    FieldT evaluateA(const std::vector<FieldT> &assignment) const override
+    {
+        return master->a.evaluate(assignment, master_translator);
+    }
+
+    FieldT evaluateB(const std::vector<FieldT> &assignment) const override
+    {
+        return master->b.evaluate(assignment, master_translator);
+    }
+
+    FieldT evaluateC(const std::vector<FieldT> &assignment) const override
+    {
+        return master->c.evaluate(assignment, master_translator);
+    }
+
+    void swapAB() override
+    {
+        master_translator->swapAB();
+    }
+
+private:
+
+    const r1cs_constraint_light<FieldT>* master;
+    ITranslator* master_translator;
 };
 
 /************************* R1CS variable assignment **************************/
@@ -115,7 +256,7 @@ public:
     size_t primary_input_size;
     size_t auxiliary_input_size;
 
-    std::vector<r1cs_constraint<FieldT> > constraints;
+    std::vector<std::unique_ptr<IConstraint<FieldT>>> constraints;
 
     r1cs_constraint_system() : primary_input_size(0), auxiliary_input_size(0) {}
 
@@ -129,8 +270,7 @@ public:
 #endif
 
     bool is_valid() const;
-    bool is_satisfied(const r1cs_primary_input<FieldT> &primary_input,
-                      const r1cs_auxiliary_input<FieldT> &auxiliary_input) const;
+    bool is_satisfied(const std::vector<FieldT>& full_variable_assignment) const;
 
     void add_constraint(const r1cs_constraint<FieldT> &c);
     void add_constraint(const r1cs_constraint<FieldT> &c, const std::string &annotation);

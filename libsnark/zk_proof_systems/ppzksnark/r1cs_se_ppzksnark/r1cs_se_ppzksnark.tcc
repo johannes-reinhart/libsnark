@@ -60,7 +60,6 @@ std::ostream& operator<<(std::ostream &out, const r1cs_se_ppzksnark_proving_key<
     out << pk.G_ab_gamma_Z;
     out << pk.G_gamma2_Z2;
     out << pk.G_gamma2_Z_t;
-    out << pk.constraint_system;
 
     return out;
 }
@@ -77,7 +76,6 @@ std::istream& operator>>(std::istream &in, r1cs_se_ppzksnark_proving_key<ppT> &p
     in >> pk.G_ab_gamma_Z;
     in >> pk.G_gamma2_Z2;
     in >> pk.G_gamma2_Z_t;
-    in >> pk.constraint_system;
 
     return in;
 }

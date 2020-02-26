@@ -221,12 +221,13 @@ std::pair<T, sparse_vector<T> > sparse_vector<T>::accumulate(const typename std:
 #ifdef DEBUG
                 libff::print_indent(); printf("doing multiexp for w_%zu ... w_%zu\n", indices[first_pos], indices[last_pos]);
 #endif
+                std::vector<libff::bigint<FieldT::num_limbs>> exponents;
                 accumulated_value = accumulated_value + libff::multi_exp<T, FieldT, libff::multi_exp_method_bos_coster>(
                     values.begin() + first_pos,
                     values.begin() + last_pos + 1,
                     it_begin + (indices[first_pos] - offset),
                     it_begin + (indices[last_pos] - offset) + 1,
-                    chunks);
+                    exponents);
             }
         }
         else
@@ -257,12 +258,13 @@ std::pair<T, sparse_vector<T> > sparse_vector<T>::accumulate(const typename std:
 #ifdef DEBUG
         libff::print_indent(); printf("doing multiexp for w_%zu ... w_%zu\n", indices[first_pos], indices[last_pos]);
 #endif
+        std::vector<libff::bigint<FieldT::num_limbs>> exponents;
         accumulated_value = accumulated_value + libff::multi_exp<T, FieldT, libff::multi_exp_method_bos_coster>(
             values.begin() + first_pos,
             values.begin() + last_pos + 1,
             it_begin + (indices[first_pos] - offset),
             it_begin + (indices[last_pos] - offset) + 1,
-            chunks);
+            exponents);
     }
 
     return std::make_pair(accumulated_value, resulting_vector);

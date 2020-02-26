@@ -264,7 +264,7 @@ FieldT linear_combination<FieldT>::evaluate(const std::vector<FieldT> &assignmen
     FieldT acc = FieldT::zero();
     for (auto &lt : terms)
     {
-        acc += (lt.index == 0 ? FieldT::one() : assignment[lt.index-1]) * lt.coeff;
+        acc += (lt.index == 0 ? FieldT::one() : assignment[lt.index]) * lt.coeff;
     }
     return acc;
 }
@@ -400,9 +400,9 @@ void linear_combination<FieldT>::print_with_assignment(const std::vector<FieldT>
             auto it = variable_annotations.find(lt.index);
             printf("    where x_%zu (%s) was assigned value ", lt.index,
                    (it == variable_annotations.end() ? "no annotation" : it->second.c_str()));
-            full_assignment[lt.index-1].print();
+            full_assignment[lt.index].print();
             printf("      i.e. negative of ");
-            (-full_assignment[lt.index-1]).print();
+            (-full_assignment[lt.index]).print();
         }
     }
 }

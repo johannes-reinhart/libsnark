@@ -158,7 +158,6 @@ std::ostream& operator<<(std::ostream &out, const r1cs_ppzkadsnark_proving_key<p
     out << pk.H_query;
     out << pk.K_query;
     out << pk.rA_i_Z_g1;
-    out << pk.constraint_system;
 
     return out;
 }
@@ -172,7 +171,6 @@ std::istream& operator>>(std::istream &in, r1cs_ppzkadsnark_proving_key<ppT> &pk
     in >> pk.H_query;
     in >> pk.K_query;
     in >> pk.rA_i_Z_g1;
-    in >> pk.constraint_system;
 
     return in;
 }

@@ -24,7 +24,6 @@ sha256_compression_function_gadget<FieldT>::sha256_compression_function_gadget(p
                                                                                const std::string &annotation_prefix) :
     gadget<FieldT>(pb, annotation_prefix),
     prev_output(prev_output),
-    new_block(new_block),
     output(output)
 {
     /* message schedule and inputs for it */
@@ -32,6 +31,14 @@ sha256_compression_function_gadget<FieldT>::sha256_compression_function_gadget(p
     message_schedule.reset(new sha256_message_schedule_gadget<FieldT>(pb, new_block, packed_W, FMT(this->annotation_prefix, " message_schedule")));
 
     /* initalize */
+    std::vector<pb_linear_combination_array<FieldT>> round_a;
+    std::vector<pb_linear_combination_array<FieldT>> round_b;
+    std::vector<pb_linear_combination_array<FieldT>> round_c;
+    std::vector<pb_linear_combination_array<FieldT>> round_d;
+    std::vector<pb_linear_combination_array<FieldT>> round_e;
+    std::vector<pb_linear_combination_array<FieldT>> round_f;
+    std::vector<pb_linear_combination_array<FieldT>> round_g;
+    std::vector<pb_linear_combination_array<FieldT>> round_h;
     round_a.push_back(pb_linear_combination_array<FieldT>(prev_output.rbegin() + 7*32, prev_output.rbegin() + 8*32));
     round_b.push_back(pb_linear_combination_array<FieldT>(prev_output.rbegin() + 6*32, prev_output.rbegin() + 7*32));
     round_c.push_back(pb_linear_combination_array<FieldT>(prev_output.rbegin() + 5*32, prev_output.rbegin() + 6*32));
@@ -42,6 +49,7 @@ sha256_compression_function_gadget<FieldT>::sha256_compression_function_gadget(p
     round_h.push_back(pb_linear_combination_array<FieldT>(prev_output.rbegin() + 0*32, prev_output.rbegin() + 1*32));
 
     /* do the rounds */
+    round_functions.reserve(64);
     for (size_t i = 0; i < 64; ++i)
     {
         round_h.push_back(round_g[i]);
@@ -69,6 +77,7 @@ sha256_compression_function_gadget<FieldT>::sha256_compression_function_gadget(p
     /* finalize */
     unreduced_output.allocate(pb, 8, FMT(this->annotation_prefix, " unreduced_output"));
     reduced_output.allocate(pb, 8, FMT(this->annotation_prefix, " reduced_output"));
+    reduce_output.reserve(8);
     for (size_t i = 0; i < 8; ++i)
     {
         reduce_output.push_back(lastbits_gadget<FieldT>(pb,

@@ -16,6 +16,11 @@
 namespace libsnark {
 
 template<typename FieldT>
+thread_local r1cs_variable_assignment<FieldT> protoboard<FieldT>::thread_values;
+template<typename FieldT>
+thread_local r1cs_variable_assignment<FieldT> protoboard<FieldT>::thread_lc_values;
+
+template<typename FieldT>
 protoboard<FieldT>::protoboard()
 {
     constant_term = FieldT::one();
@@ -23,9 +28,18 @@ protoboard<FieldT>::protoboard()
 #ifdef DEBUG
     constraint_system.variable_annotations[0] = "ONE";
 #endif
+    values.emplace_back(constant_term);
 
     next_free_var = 1; /* to account for constant 1 term */
     next_free_lc = 0;
+
+    use_thread_values = false;
+}
+
+template<typename FieldT>
+void protoboard<FieldT>::set_use_thread_values(bool enable)
+{
+    use_thread_values = enable;
 }
 
 template<typename FieldT>
@@ -58,15 +72,23 @@ lc_index_t protoboard<FieldT>::allocate_lc_index()
 template<typename FieldT>
 FieldT& protoboard<FieldT>::val(const pb_variable<FieldT> &var)
 {
-    assert(var.index <= values.size());
-    return (var.index == 0 ? constant_term : values[var.index-1]);
+    assert(var.index < values.size());
+    if(use_thread_values && thread_values.size() < values.size())
+    {
+        thread_values.resize(values.size(), FieldT::zero());
+    }
+    return (var.index == 0 ? constant_term : (use_thread_values ? thread_values[var.index] : values[var.index]));
 }
 
 template<typename FieldT>
 FieldT protoboard<FieldT>::val(const pb_variable<FieldT> &var) const
 {
-    assert(var.index <= values.size());
-    return (var.index == 0 ? constant_term : values[var.index-1]);
+    assert(var.index < values.size());
+    if(use_thread_values && thread_values.size() < values.size())
+    {
+        thread_values.resize(values.size(), FieldT::zero());
+    }
+    return (var.index == 0 ? constant_term : (use_thread_values ? thread_values[var.index] : values[var.index]));
 }
 
 template<typename FieldT>
@@ -79,7 +101,11 @@ FieldT& protoboard<FieldT>::lc_val(const pb_linear_combination<FieldT> &lc)
     else
     {
         assert(lc.index < lc_values.size());
-        return lc_values[lc.index];
+        if(use_thread_values && thread_lc_values.size() < lc_values.size())
+        {
+            thread_lc_values.resize(lc_values.size(), FieldT::zero());
+        }
+        return use_thread_values ? thread_lc_values[lc.index] : lc_values[lc.index];
     }
 }
 
@@ -93,7 +119,11 @@ FieldT protoboard<FieldT>::lc_val(const pb_linear_combination<FieldT> &lc) const
     else
     {
         assert(lc.index < lc_values.size());
-        return lc_values[lc.index];
+        if(use_thread_values && thread_lc_values.size() < lc_values.size())
+        {
+            thread_lc_values.resize(lc_values.size(), FieldT::zero());
+        }
+        return use_thread_values ? thread_lc_values[lc.index] : lc_values[lc.index];
     }
 }
 
@@ -106,7 +136,7 @@ void protoboard<FieldT>::add_r1cs_constraint(const r1cs_constraint<FieldT> &cons
 #else
     libff::UNUSED(annotation);
 #endif
-    constraint_system.constraints.emplace_back(constr);
+    constraint_system.add_constraint(constr);
 }
 
 template<typename FieldT>
@@ -121,7 +151,7 @@ void protoboard<FieldT>::augment_variable_annotation(const pb_variable<FieldT> &
 template<typename FieldT>
 bool protoboard<FieldT>::is_satisfied() const
 {
-    return constraint_system.is_satisfied(primary_input(), auxiliary_input());
+    return constraint_system.is_satisfied(values);
 }
 
 template<typename FieldT>
@@ -171,19 +201,13 @@ r1cs_variable_assignment<FieldT> protoboard<FieldT>::full_variable_assignment() 
 template<typename FieldT>
 r1cs_primary_input<FieldT> protoboard<FieldT>::primary_input() const
 {
-    return r1cs_primary_input<FieldT>(values.begin(), values.begin() + num_inputs());
+    return r1cs_primary_input<FieldT>(values.begin() + 1, values.begin() + 1 + num_inputs());
 }
 
 template<typename FieldT>
 r1cs_auxiliary_input<FieldT> protoboard<FieldT>::auxiliary_input() const
 {
-    return r1cs_auxiliary_input<FieldT>(values.begin() + num_inputs(), values.end());
-}
-
-template<typename FieldT>
-r1cs_constraint_system<FieldT> protoboard<FieldT>::get_constraint_system() const
-{
-    return constraint_system;
+    return r1cs_auxiliary_input<FieldT>(values.begin() + 1 + num_inputs(), values.end());
 }
 
 } // libsnark

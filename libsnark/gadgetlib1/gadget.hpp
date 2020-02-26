@@ -14,10 +14,9 @@ namespace libsnark {
 
 template<typename FieldT>
 class gadget {
-protected:
+public:
     protoboard<FieldT> &pb;
     const std::string annotation_prefix;
-public:
     gadget(protoboard<FieldT> &pb, const std::string &annotation_prefix="");
 };
 

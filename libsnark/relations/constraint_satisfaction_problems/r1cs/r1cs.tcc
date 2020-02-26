@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cassert>
 #include <set>
+#include <memory>
 
 #include <libff/algebra/fields/bigint.hpp>
 #include <libff/common/profiling.hpp>
@@ -120,34 +121,27 @@ bool r1cs_constraint_system<FieldT>::is_valid() const
 }
 
 template<typename FieldT>
-void dump_r1cs_constraint(const r1cs_constraint<FieldT> &constraint,
+void dump_r1cs_constraint(const r1cs_constraint_light<FieldT> &constraint,
                           const r1cs_variable_assignment<FieldT> &full_variable_assignment,
                           const std::map<size_t, std::string> &variable_annotations)
 {
-    printf("terms for a:\n"); constraint.a.print_with_assignment(full_variable_assignment, variable_annotations);
-    printf("terms for b:\n"); constraint.b.print_with_assignment(full_variable_assignment, variable_annotations);
-    printf("terms for c:\n"); constraint.c.print_with_assignment(full_variable_assignment, variable_annotations);
+    //printf("terms for a:\n"); constraint.a.print_with_assignment(full_variable_assignment, variable_annotations);
+    //printf("terms for b:\n"); constraint.b.print_with_assignment(full_variable_assignment, variable_annotations);
+    //printf("terms for c:\n"); constraint.c.print_with_assignment(full_variable_assignment, variable_annotations);
 }
 
 template<typename FieldT>
-bool r1cs_constraint_system<FieldT>::is_satisfied(const r1cs_primary_input<FieldT> &primary_input,
-                                                  const r1cs_auxiliary_input<FieldT> &auxiliary_input) const
+bool r1cs_constraint_system<FieldT>::is_satisfied(const std::vector<FieldT>& full_variable_assignment) const
 {
-    assert(primary_input.size() == num_inputs());
-    assert(primary_input.size() + auxiliary_input.size() == num_variables());
-
-    r1cs_variable_assignment<FieldT> full_variable_assignment = primary_input;
-    full_variable_assignment.insert(full_variable_assignment.end(), auxiliary_input.begin(), auxiliary_input.end());
-
     bool bSatisified = true;
 #if defined(MULTICORE) && !defined(DEBUG)
     #pragma omp parallel for
 #endif
     for (size_t c = 0; c < constraints.size(); ++c)
     {
-        const FieldT ares = constraints[c].a.evaluate(full_variable_assignment);
-        const FieldT bres = constraints[c].b.evaluate(full_variable_assignment);
-        const FieldT cres = constraints[c].c.evaluate(full_variable_assignment);
+        const FieldT ares = constraints[c]->evaluateA(full_variable_assignment);
+        const FieldT bres = constraints[c]->evaluateB(full_variable_assignment);
+        const FieldT cres = constraints[c]->evaluateC(full_variable_assignment);
 
         if (!(ares*bres == cres))
         {
@@ -158,7 +152,7 @@ bool r1cs_constraint_system<FieldT>::is_satisfied(const r1cs_primary_input<Field
             printf("<b,(1,x)> = "); bres.print();
             printf("<c,(1,x)> = "); cres.print();
             printf("constraint was:\n");
-            dump_r1cs_constraint(constraints[c], full_variable_assignment, variable_annotations);
+            //dump_r1cs_constraint(constraints[c], full_variable_assignment, variable_annotations);
             return false;
 #else
             bSatisified = false;
@@ -172,7 +166,28 @@ bool r1cs_constraint_system<FieldT>::is_satisfied(const r1cs_primary_input<Field
 template<typename FieldT>
 void r1cs_constraint_system<FieldT>::add_constraint(const r1cs_constraint<FieldT> &c)
 {
-    constraints.emplace_back(c);
+    std::vector<linear_term_light<FieldT>> terms_a;
+    terms_a.reserve(c.a.terms.size());
+    for (unsigned int i = 0; i < c.a.terms.size(); i++)
+    {
+        terms_a.emplace_back(c.a.terms[i].index, ConstantStorage<FieldT>::getInstance().add(c.a.terms[i].coeff));
+    }
+
+    std::vector<linear_term_light<FieldT>> terms_b;
+    terms_b.reserve(c.b.terms.size());
+    for (unsigned int i = 0; i < c.b.terms.size(); i++)
+    {
+        terms_b.emplace_back(c.b.terms[i].index, ConstantStorage<FieldT>::getInstance().add(c.b.terms[i].coeff));
+    }
+
+    std::vector<linear_term_light<FieldT>> terms_c;
+    terms_c.reserve(c.c.terms.size());
+    for (unsigned int i = 0; i < c.c.terms.size(); i++)
+    {
+        terms_c.emplace_back(c.c.terms[i].index, ConstantStorage<FieldT>::getInstance().add(c.c.terms[i].coeff));
+    }
+
+    constraints.emplace_back(make_unique<r1cs_constraint_light<FieldT>>(terms_a, terms_b, terms_c));
 }
 
 template<typename FieldT>
@@ -181,7 +196,7 @@ void r1cs_constraint_system<FieldT>::add_constraint(const r1cs_constraint<FieldT
 #ifdef DEBUG
     constraint_annotations[constraints.size()] = annotation;
 #endif
-    constraints.emplace_back(c);
+    add_constraint(c);
 }
 
 template<typename FieldT>
@@ -192,16 +207,21 @@ void r1cs_constraint_system<FieldT>::swap_AB_if_beneficial()
     libff::enter_block("Estimate densities");
     libff::bit_vector touched_by_A(this->num_variables() + 1, false), touched_by_B(this->num_variables() + 1, false);
 
+#ifdef MULTICORE
+    #pragma omp parallel for
+#endif
     for (size_t i = 0; i < this->constraints.size(); ++i)
     {
-        for (size_t j = 0; j < this->constraints[i].a.terms.size(); ++j)
+        auto a = this->constraints[i]->getA().getTerms();
+        for (size_t j = 0; j < a.size(); ++j)
         {
-            touched_by_A[this->constraints[i].a.terms[j].index] = true;
+            touched_by_A[a[j].index] = true;
         }
 
-        for (size_t j = 0; j < this->constraints[i].b.terms.size(); ++j)
+        auto b = this->constraints[i]->getB().getTerms();
+        for (size_t j = 0; j < b.size(); ++j)
         {
-            touched_by_B[this->constraints[i].b.terms[j].index] = true;
+            touched_by_B[b[j].index] = true;
         }
     }
 
@@ -222,9 +242,12 @@ void r1cs_constraint_system<FieldT>::swap_AB_if_beneficial()
     if (non_zero_B_count > non_zero_A_count)
     {
         libff::enter_block("Perform the swap");
+#ifdef MULTICORE
+        #pragma omp parallel for
+#endif
         for (size_t i = 0; i < this->constraints.size(); ++i)
         {
-            std::swap(this->constraints[i].a, this->constraints[i].b);
+            constraints[i]->swapAB();
         }
         libff::leave_block("Perform the swap");
     }
@@ -251,7 +274,7 @@ std::ostream& operator<<(std::ostream &out, const r1cs_constraint_system<FieldT>
     out << cs.auxiliary_input_size << "\n";
 
     out << cs.num_constraints() << "\n";
-    for (const r1cs_constraint<FieldT>& c : cs.constraints)
+    for (const r1cs_constraint_light<FieldT>& c : cs.constraints)
     {
         out << c;
     }
@@ -279,7 +302,7 @@ std::istream& operator>>(std::istream &in, r1cs_constraint_system<FieldT> &cs)
     {
         r1cs_constraint<FieldT> c;
         in >> c;
-        cs.constraints.emplace_back(c);
+        cs.add_constraint(c);
     }
 
     return in;

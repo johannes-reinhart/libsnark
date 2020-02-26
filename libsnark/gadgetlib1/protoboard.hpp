@@ -31,13 +31,19 @@ template<typename FieldT>
 class protoboard {
 private:
     FieldT constant_term; /* only here, because pb.val() needs to be able to return reference to the constant 1 term */
-    r1cs_variable_assignment<FieldT> values; /* values[0] will hold the value of the first allocated variable of the protoboard, *NOT* constant 1 */
     var_index_t next_free_var;
     lc_index_t next_free_lc;
-    std::vector<FieldT> lc_values;
-    r1cs_constraint_system<FieldT> constraint_system;
+
+    bool use_thread_values;
 
 public:
+    r1cs_variable_assignment<FieldT> values; /* values[0] will hold the value of the first allocated variable of the protoboard, *NOT* constant 1 */
+    r1cs_constraint_system<FieldT> constraint_system;
+    std::vector<FieldT> lc_values;
+
+    static thread_local r1cs_variable_assignment<FieldT> thread_values;
+    static thread_local r1cs_variable_assignment<FieldT> thread_lc_values;
+
     protoboard();
 
     void clear_values();
@@ -62,7 +68,8 @@ public:
     r1cs_variable_assignment<FieldT> full_variable_assignment() const;
     r1cs_primary_input<FieldT> primary_input() const;
     r1cs_auxiliary_input<FieldT> auxiliary_input() const;
-    r1cs_constraint_system<FieldT> get_constraint_system() const;
+
+    void set_use_thread_values(bool enable);
 
     friend class pb_variable<FieldT>;
     friend class pb_linear_combination<FieldT>;

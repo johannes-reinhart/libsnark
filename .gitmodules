@@ -16,4 +16,4 @@
 [submodule "depends/libff"]
 	path = depends/libff
 	url = https://github.com/Loopring/libff.git
-	branch = mcl
+	branch = opt

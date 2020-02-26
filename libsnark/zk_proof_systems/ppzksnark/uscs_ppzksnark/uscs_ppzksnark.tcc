@@ -48,7 +48,6 @@ std::ostream& operator<<(std::ostream &out, const uscs_ppzksnark_proving_key<ppT
     out << pk.alpha_V_g1_query;
     out << pk.H_g1_query;
     out << pk.V_g2_query;
-    out << pk.constraint_system;
 
     return out;
 }
@@ -60,7 +59,6 @@ std::istream& operator>>(std::istream &in, uscs_ppzksnark_proving_key<ppT> &pk)
     in >> pk.alpha_V_g1_query;
     in >> pk.H_g1_query;
     in >> pk.V_g2_query;
-    in >> pk.constraint_system;
 
     return in;
 }

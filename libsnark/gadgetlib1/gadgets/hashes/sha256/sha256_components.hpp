@@ -69,14 +69,6 @@ public:
     pb_variable<FieldT> packed_new_a;
     pb_variable<FieldT> packed_new_e;
 public:
-    pb_linear_combination_array<FieldT> a;
-    pb_linear_combination_array<FieldT> b;
-    pb_linear_combination_array<FieldT> c;
-    pb_linear_combination_array<FieldT> d;
-    pb_linear_combination_array<FieldT> e;
-    pb_linear_combination_array<FieldT> f;
-    pb_linear_combination_array<FieldT> g;
-    pb_linear_combination_array<FieldT> h;
     pb_variable<FieldT> W;
     const FieldT K;
     pb_linear_combination_array<FieldT> new_a;

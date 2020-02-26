@@ -18,74 +18,121 @@ knowledge_commitment<T1,T2> opt_window_wnaf_exp(const knowledge_commitment<T1,T2
                                        opt_window_wnaf_exp(base.h, scalar, scalar_bits));
 }
 
-template<typename T1, typename T2, typename FieldT, libff::multi_exp_method Method>
-knowledge_commitment<T1, T2> kc_multi_exp_with_mixed_addition(const knowledge_commitment_vector<T1, T2> &vec,
-                                                                const size_t min_idx,
-                                                                const size_t max_idx,
-                                                                typename std::vector<FieldT>::const_iterator scalar_start,
-                                                                typename std::vector<FieldT>::const_iterator scalar_end,
-                                                                const size_t chunks)
+template<typename T, typename FieldT, libff::multi_exp_method Method>
+T kc_multi_exp_with_mixed_addition(const sparse_vector<T> &vec,
+                                    typename std::vector<FieldT>::const_iterator scalar_start,
+                                    typename std::vector<FieldT>::const_iterator scalar_end,
+                                    std::vector<libff::bigint<FieldT::num_limbs>>& scratch_exponents,
+                                    const Config& config)
 {
     libff::enter_block("Process scalar vector");
-    auto index_it = std::lower_bound(vec.indices.begin(), vec.indices.end(), min_idx);
-    const size_t offset = index_it - vec.indices.begin();
-
-    auto value_it = vec.values.begin() + offset;
+    auto index_it = vec.indices.begin();
+    auto value_it = vec.values.begin();
 
     const FieldT zero = FieldT::zero();
     const FieldT one = FieldT::one();
 
-    std::vector<FieldT> p;
-    std::vector<knowledge_commitment<T1, T2> > g;
+    //size_t num_skip = 0;
+    //size_t num_add = 0;
+    //size_t num_other = 0;
 
-    knowledge_commitment<T1, T2> acc = knowledge_commitment<T1, T2>::zero();
+    const size_t scalar_size = std::distance(scalar_start, scalar_end);
+    const size_t scalar_length = vec.indices.size();
 
-    size_t num_skip = 0;
-    size_t num_add = 0;
-    size_t num_other = 0;
+    libff::enter_block("allocate density memory");
+    std::vector<bool> density(scalar_length);
+    libff::leave_block("allocate density memory");
 
-    const size_t scalar_length = std::distance(scalar_start, scalar_end);
-
-    while (index_it != vec.indices.end() && *index_it < max_idx)
+    std::vector<libff::bigint<FieldT::num_limbs>>& bn_exponents = scratch_exponents;
+    if (bn_exponents.size() < scalar_length)
     {
-        const size_t scalar_position = (*index_it) - min_idx;
-        assert(scalar_position < scalar_length);
-
-        const FieldT scalar = *(scalar_start + scalar_position);
-
-        if (scalar == zero)
-        {
-            // do nothing
-            ++num_skip;
-        }
-        else if (scalar == one)
-        {
-#ifdef USE_MIXED_ADDITION
-            acc.g = acc.g.mixed_add(value_it->g);
-            acc.h = acc.h.mixed_add(value_it->h);
-#else
-            acc.g = acc.g + value_it->g;
-            acc.h = acc.h + value_it->h;
-#endif
-            ++num_add;
-        }
-        else
-        {
-            p.emplace_back(scalar);
-            g.emplace_back(*value_it);
-            ++num_other;
-        }
-
-        ++index_it;
-        ++value_it;
+        bn_exponents.resize(scalar_length);
     }
 
-    libff::print_indent(); printf("* Elements of w skipped: %zu (%0.2f%%)\n", num_skip, 100.*num_skip/(num_skip+num_add+num_other));
-    libff::print_indent(); printf("* Elements of w processed with special addition: %zu (%0.2f%%)\n", num_add, 100.*num_add/(num_skip+num_add+num_other));
-    libff::print_indent(); printf("* Elements of w remaining: %zu (%0.2f%%)\n", num_other, 100.*num_other/(num_skip+num_add+num_other));
+    auto ranges = libsnark::get_cpu_ranges(0, scalar_length);
+
+    libff::enter_block("find max index");
+    std::vector<unsigned int> partial_max_indices(ranges.size(), 0xffffffff);
+#ifdef MULTICORE
+    #pragma omp parallel for
+#endif
+    for (size_t j = 0; j < ranges.size(); j++)
+    {
+        T result = T::zero();
+        unsigned int count = 0;
+        for (unsigned int i = ranges[j].first; i < ranges[j].second; i++)
+        {
+            if(index_it[i] >= scalar_size)
+            {
+                partial_max_indices[j] = i;
+                break;
+            }
+        }
+    }
+
+    unsigned int actual_max_idx = scalar_length;
+    for (size_t j = 0; j < ranges.size(); j++)
+    {
+        if (partial_max_indices[j] != 0xffffffff)
+        {
+            actual_max_idx = partial_max_indices[j];
+            break;
+        }
+    }
+    libff::leave_block("find max index");
+
+    ranges = get_cpu_ranges(0, actual_max_idx);
+
+    std::vector<T> partial(ranges.size(), T::zero());
+    std::vector<unsigned int> counters(ranges.size(), 0);
+
+#ifdef MULTICORE
+    #pragma omp parallel for
+#endif
+    for (size_t j = 0; j < ranges.size(); j++)
+    {
+        T result = T::zero();
+        unsigned int count = 0;
+        for (unsigned int i = ranges[j].first; i < ranges[j].second; i++)
+        {
+            const FieldT scalar = scalar_start[index_it[i]];
+            if (scalar == zero)
+            {
+                // do nothing
+                //++num_skip;
+            }
+            else if (scalar == one)
+            {
+#ifdef USE_MIXED_ADDITION
+                result = result.mixed_add(value_it);
+#else
+                result = result + value_it[i];
+#endif
+                //++num_add;
+            }
+            else
+            {
+                density[i] = true;
+                bn_exponents[i] = scalar.as_bigint();
+                ++count;
+                //++num_other;
+            }
+        }
+        partial[j] = result;
+        counters[j] = count;
+    }
+
+    T acc = T::zero();
+    unsigned int totalCount = 0;
+    for (unsigned int i = 0; i < ranges.size(); i++)
+    {
+        acc = acc + partial[i];
+        totalCount += counters[i];
+    }
+
     libff::leave_block("Process scalar vector");
 
-    return acc + libff::multi_exp<knowledge_commitment<T1, T2>, FieldT, Method>(g.begin(), g.end(), p.begin(), p.end(), chunks);
+    return acc + libff::multi_exp_with_density<T, FieldT, true, Method>(vec.values.begin(), vec.values.end(), bn_exponents, density, config);
 }
 
 template<typename T1, typename T2, typename FieldT>
