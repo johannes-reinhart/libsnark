@@ -44,8 +44,7 @@ bool r1cs_se_ppzksnark_proving_key<ppT>::operator==(const r1cs_se_ppzksnark_prov
             this->H_gamma_Z == other.H_gamma_Z &&
             this->G_ab_gamma_Z == other.G_ab_gamma_Z &&
             this->G_gamma2_Z2 == other.G_gamma2_Z2 &&
-            this->G_gamma2_Z_t == other.G_gamma2_Z_t &&
-            this->constraint_system == other.constraint_system);
+            this->G_gamma2_Z_t == other.G_gamma2_Z_t);
 }
 
 template<typename ppT>
@@ -60,7 +59,6 @@ std::ostream& operator<<(std::ostream &out, const r1cs_se_ppzksnark_proving_key<
     out << pk.G_ab_gamma_Z;
     out << pk.G_gamma2_Z2;
     out << pk.G_gamma2_Z_t;
-    out << pk.constraint_system;
 
     return out;
 }
@@ -77,7 +75,6 @@ std::istream& operator>>(std::istream &in, r1cs_se_ppzksnark_proving_key<ppT> &p
     in >> pk.G_ab_gamma_Z;
     in >> pk.G_gamma2_Z2;
     in >> pk.G_gamma2_Z_t;
-    in >> pk.constraint_system;
 
     return in;
 }
@@ -281,7 +278,7 @@ r1cs_se_ppzksnark_keypair<ppT> r1cs_se_ppzksnark_generator(const r1cs_se_ppzksna
            G_window = libff::get_exp_window_size<libff::G1<ppT> >(G_exp_count);
     libff::print_indent(); printf("* G window: %zu\n", G_window);
     libff::window_table<libff::G1<ppT> > G_table = get_window_table(
-        libff::Fr<ppT>::size_in_bits(), G_window, G);
+        libff::Fr<ppT>::ceil_size_in_bits(), G_window, G);
     libff::leave_block("Generating G multiexp table");
 
     libff::enter_block("Generating H_gamma multiexp table");
@@ -290,7 +287,7 @@ r1cs_se_ppzksnark_keypair<ppT> r1cs_se_ppzksnark_generator(const r1cs_se_ppzksna
            H_gamma_window = libff::get_exp_window_size<libff::G2<ppT> >(H_gamma_exp_count);
     libff::print_indent(); printf("* H_gamma window: %zu\n", H_gamma_window);
     libff::window_table<libff::G2<ppT> > H_gamma_table = get_window_table(
-        libff::Fr<ppT>::size_in_bits(), H_gamma_window, H_gamma);
+        libff::Fr<ppT>::ceil_size_in_bits(), H_gamma_window, H_gamma);
     libff::leave_block("Generating H_gamma multiexp table");
 
     libff::enter_block("Generate R1CS verification key");
@@ -305,7 +302,7 @@ r1cs_se_ppzksnark_keypair<ppT> r1cs_se_ppzksnark_generator(const r1cs_se_ppzksna
     }
     libff::G1_vector<ppT> verifier_query = libff::batch_exp<libff::G1<ppT>,
                                                             libff::Fr<ppT> >(
-        libff::Fr<ppT>::size_in_bits(),
+        libff::Fr<ppT>::ceil_size_in_bits(),
         G_window,
         G_table,
         tmp_exponents);
@@ -324,7 +321,7 @@ r1cs_se_ppzksnark_keypair<ppT> r1cs_se_ppzksnark_generator(const r1cs_se_ppzksna
 
     libff::G1_vector<ppT> A_query = libff::batch_exp<libff::G1<ppT>,
                                                      libff::Fr<ppT> >(
-        libff::Fr<ppT>::size_in_bits(),
+        libff::Fr<ppT>::ceil_size_in_bits(),
         G_window,
         G_table,
         tmp_exponents);
@@ -337,7 +334,7 @@ r1cs_se_ppzksnark_keypair<ppT> r1cs_se_ppzksnark_generator(const r1cs_se_ppzksna
     libff::enter_block("Compute the B-query", false);
     libff::G2_vector<ppT> B_query = libff::batch_exp<libff::G2<ppT>,
                                                      libff::Fr<ppT> >(
-        libff::Fr<ppT>::size_in_bits(),
+        libff::Fr<ppT>::ceil_size_in_bits(),
         H_gamma_window,
         H_gamma_table,
         At);
@@ -364,7 +361,7 @@ r1cs_se_ppzksnark_keypair<ppT> r1cs_se_ppzksnark_generator(const r1cs_se_ppzksna
     }
     libff::G1_vector<ppT> G_gamma2_Z_t = libff::batch_exp<libff::G1<ppT>,
                                                           libff::Fr<ppT> >(
-        libff::Fr<ppT>::size_in_bits(),
+        libff::Fr<ppT>::ceil_size_in_bits(),
         G_window,
         G_table,
         tmp_exponents);
@@ -385,7 +382,7 @@ r1cs_se_ppzksnark_keypair<ppT> r1cs_se_ppzksnark_generator(const r1cs_se_ppzksna
     }
     libff::G1_vector<ppT> C_query_1 = libff::batch_exp<libff::G1<ppT>,
                                                        libff::Fr<ppT> >(
-        libff::Fr<ppT>::size_in_bits(),
+        libff::Fr<ppT>::ceil_size_in_bits(),
         G_window,
         G_table,
         tmp_exponents);
@@ -405,7 +402,7 @@ r1cs_se_ppzksnark_keypair<ppT> r1cs_se_ppzksnark_generator(const r1cs_se_ppzksna
     }
     libff::G1_vector<ppT> C_query_2 = libff::batch_exp<libff::G1<ppT>,
                                                        libff::Fr<ppT> >(
-        libff::Fr<ppT>::size_in_bits(),
+        libff::Fr<ppT>::ceil_size_in_bits(),
         G_window,
         G_table,
         tmp_exponents);
@@ -423,12 +420,10 @@ r1cs_se_ppzksnark_keypair<ppT> r1cs_se_ppzksnark_generator(const r1cs_se_ppzksna
         r1cs_se_ppzksnark_verification_key<ppT>(H, G_alpha, H_beta, G_gamma,
             H_gamma, std::move(verifier_query));
 
-    r1cs_se_ppzksnark_constraint_system<ppT> cs_copy(cs);
-
     r1cs_se_ppzksnark_proving_key<ppT> pk = r1cs_se_ppzksnark_proving_key<ppT>(
         std::move(A_query), std::move(B_query), std::move(C_query_1),
         std::move(C_query_2), G_gamma_Z, H_gamma_Z, G_ab_gamma_Z, G_gamma2_Z2,
-        std::move(G_gamma2_Z_t), std::move(cs_copy));
+        std::move(G_gamma2_Z_t));
 
     pk.print_size();
     vk.print_size();
@@ -438,8 +433,9 @@ r1cs_se_ppzksnark_keypair<ppT> r1cs_se_ppzksnark_generator(const r1cs_se_ppzksna
 
 template <typename ppT>
 r1cs_se_ppzksnark_proof<ppT> r1cs_se_ppzksnark_prover(const r1cs_se_ppzksnark_proving_key<ppT> &pk,
-                                                const r1cs_se_ppzksnark_primary_input<ppT> &primary_input,
-                                                const r1cs_se_ppzksnark_auxiliary_input<ppT> &auxiliary_input)
+                                                      const r1cs_se_ppzksnark_constraint_system<ppT> &constraint_system,
+                                                      const r1cs_se_ppzksnark_primary_input<ppT> &primary_input,
+                                                        const r1cs_se_ppzksnark_auxiliary_input<ppT> &auxiliary_input)
 {
     libff::enter_block("Call to r1cs_se_ppzksnark_prover");
 
@@ -452,12 +448,12 @@ r1cs_se_ppzksnark_proof<ppT> r1cs_se_ppzksnark_prover(const r1cs_se_ppzksnark_pr
 
     libff::enter_block("Compute the polynomial H");
     const sap_witness<libff::Fr<ppT> > sap_wit = r1cs_to_sap_witness_map(
-        pk.constraint_system, primary_input, auxiliary_input, d1, d2);
+        constraint_system, primary_input, auxiliary_input, d1, d2);
     libff::leave_block("Compute the polynomial H");
 
 #ifdef DEBUG
     const libff::Fr<ppT> t = libff::Fr<ppT>::random_element();
-    sap_instance_evaluation<libff::Fr<ppT> > sap_inst = r1cs_to_sap_instance_map_with_evaluation(pk.constraint_system, t);
+    sap_instance_evaluation<libff::Fr<ppT> > sap_inst = r1cs_to_sap_instance_map_with_evaluation(constraint_system, t);
     assert(sap_inst.is_satisfied(sap_wit));
 #endif
 

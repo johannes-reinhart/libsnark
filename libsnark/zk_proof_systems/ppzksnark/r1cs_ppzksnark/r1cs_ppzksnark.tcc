@@ -40,8 +40,7 @@ bool r1cs_ppzksnark_proving_key<ppT>::operator==(const r1cs_ppzksnark_proving_ke
             this->B_query == other.B_query &&
             this->C_query == other.C_query &&
             this->H_query == other.H_query &&
-            this->K_query == other.K_query &&
-            this->constraint_system == other.constraint_system);
+            this->K_query == other.K_query);
 }
 
 template<typename ppT>
@@ -52,7 +51,6 @@ std::ostream& operator<<(std::ostream &out, const r1cs_ppzksnark_proving_key<ppT
     out << pk.C_query;
     out << pk.H_query;
     out << pk.K_query;
-    out << pk.constraint_system;
 
     return out;
 }
@@ -65,7 +63,6 @@ std::istream& operator>>(std::istream &in, r1cs_ppzksnark_proving_key<ppT> &pk)
     in >> pk.C_query;
     in >> pk.H_query;
     in >> pk.K_query;
-    in >> pk.constraint_system;
 
     return in;
 }
@@ -329,8 +326,12 @@ r1cs_ppzksnark_keypair<ppT> r1cs_ppzksnark_generator(const r1cs_ppzksnark_constr
 
     size_t g1_window = libff::get_exp_window_size<libff::G1<ppT> >(g1_exp_count);
     size_t g2_window = libff::get_exp_window_size<libff::G2<ppT> >(g2_exp_count);
-    libff::print_indent(); printf("* G1 window: %zu\n", g1_window);
-    libff::print_indent(); printf("* G2 window: %zu\n", g2_window);
+    if(!libff::inhibit_profiling_info) {
+        libff::print_indent();
+        printf("* G1 window: %zu\n", g1_window);
+        libff::print_indent();
+        printf("* G2 window: %zu\n", g2_window);
+    }
 
 #ifdef MULTICORE
     const size_t chunks = omp_get_max_threads(); // to override, set OMP_NUM_THREADS env var or call omp_set_num_threads()
@@ -339,37 +340,37 @@ r1cs_ppzksnark_keypair<ppT> r1cs_ppzksnark_generator(const r1cs_ppzksnark_constr
 #endif
 
     libff::enter_block("Generating G1 multiexp table");
-    libff::window_table<libff::G1<ppT> > g1_table = get_window_table(libff::Fr<ppT>::size_in_bits(), g1_window, libff::G1<ppT>::one());
+    libff::window_table<libff::G1<ppT> > g1_table = get_window_table(libff::Fr<ppT>::ceil_size_in_bits(), g1_window, libff::G1<ppT>::one());
     libff::leave_block("Generating G1 multiexp table");
 
     libff::enter_block("Generating G2 multiexp table");
-    libff::window_table<libff::G2<ppT> > g2_table = get_window_table(libff::Fr<ppT>::size_in_bits(), g2_window, libff::G2<ppT>::one());
+    libff::window_table<libff::G2<ppT> > g2_table = get_window_table(libff::Fr<ppT>::ceil_size_in_bits(), g2_window, libff::G2<ppT>::one());
     libff::leave_block("Generating G2 multiexp table");
 
     libff::enter_block("Generate R1CS proving key");
 
     libff::enter_block("Generate knowledge commitments");
     libff::enter_block("Compute the A-query", false);
-    knowledge_commitment_vector<libff::G1<ppT>, libff::G1<ppT> > A_query = kc_batch_exp(libff::Fr<ppT>::size_in_bits(), g1_window, g1_window, g1_table, g1_table, rA, rA*alphaA, At, chunks);
+    knowledge_commitment_vector<libff::G1<ppT>, libff::G1<ppT> > A_query = kc_batch_exp(libff::Fr<ppT>::ceil_size_in_bits(), g1_window, g1_window, g1_table, g1_table, rA, rA*alphaA, At, chunks);
     libff::leave_block("Compute the A-query", false);
 
     libff::enter_block("Compute the B-query", false);
-    knowledge_commitment_vector<libff::G2<ppT>, libff::G1<ppT> > B_query = kc_batch_exp(libff::Fr<ppT>::size_in_bits(), g2_window, g1_window, g2_table, g1_table, rB, rB*alphaB, Bt, chunks);
+    knowledge_commitment_vector<libff::G2<ppT>, libff::G1<ppT> > B_query = kc_batch_exp(libff::Fr<ppT>::ceil_size_in_bits(), g2_window, g1_window, g2_table, g1_table, rB, rB*alphaB, Bt, chunks);
     libff::leave_block("Compute the B-query", false);
 
     libff::enter_block("Compute the C-query", false);
-    knowledge_commitment_vector<libff::G1<ppT>, libff::G1<ppT> > C_query = kc_batch_exp(libff::Fr<ppT>::size_in_bits(), g1_window, g1_window, g1_table, g1_table, rC, rC*alphaC, Ct, chunks);
+    knowledge_commitment_vector<libff::G1<ppT>, libff::G1<ppT> > C_query = kc_batch_exp(libff::Fr<ppT>::ceil_size_in_bits(), g1_window, g1_window, g1_table, g1_table, rC, rC*alphaC, Ct, chunks);
     libff::leave_block("Compute the C-query", false);
 
     libff::enter_block("Compute the H-query", false);
-    libff::G1_vector<ppT> H_query = batch_exp(libff::Fr<ppT>::size_in_bits(), g1_window, g1_table, Ht);
+    libff::G1_vector<ppT> H_query = batch_exp(libff::Fr<ppT>::ceil_size_in_bits(), g1_window, g1_table, Ht);
 #ifdef USE_MIXED_ADDITION
     libff::batch_to_special<libff::G1<ppT> >(H_query);
 #endif
     libff::leave_block("Compute the H-query", false);
 
     libff::enter_block("Compute the K-query", false);
-    libff::G1_vector<ppT> K_query = batch_exp(libff::Fr<ppT>::size_in_bits(), g1_window, g1_table, Kt);
+    libff::G1_vector<ppT> K_query = batch_exp(libff::Fr<ppT>::ceil_size_in_bits(), g1_window, g1_table, Kt);
 #ifdef USE_MIXED_ADDITION
     libff::batch_to_special<libff::G1<ppT> >(K_query);
 #endif
@@ -396,7 +397,7 @@ r1cs_ppzksnark_keypair<ppT> r1cs_ppzksnark_generator(const r1cs_ppzksnark_constr
     {
         multiplied_IC_coefficients.emplace_back(rA * IC_coefficients[i]);
     }
-    libff::G1_vector<ppT> encoded_IC_values = batch_exp(libff::Fr<ppT>::size_in_bits(), g1_window, g1_table, multiplied_IC_coefficients);
+    libff::G1_vector<ppT> encoded_IC_values = batch_exp(libff::Fr<ppT>::ceil_size_in_bits(), g1_window, g1_table, multiplied_IC_coefficients);
 
     libff::leave_block("Encode IC query for R1CS verification key");
     libff::leave_block("Generate R1CS verification key");
@@ -417,8 +418,7 @@ r1cs_ppzksnark_keypair<ppT> r1cs_ppzksnark_generator(const r1cs_ppzksnark_constr
                                                                          std::move(B_query),
                                                                          std::move(C_query),
                                                                          std::move(H_query),
-                                                                         std::move(K_query),
-                                                                         std::move(cs_copy));
+                                                                         std::move(K_query));
 
     pk.print_size();
     vk.print_size();
@@ -428,13 +428,14 @@ r1cs_ppzksnark_keypair<ppT> r1cs_ppzksnark_generator(const r1cs_ppzksnark_constr
 
 template <typename ppT>
 r1cs_ppzksnark_proof<ppT> r1cs_ppzksnark_prover(const r1cs_ppzksnark_proving_key<ppT> &pk,
+                                                const r1cs_ppzksnark_constraint_system<ppT> &constraint_system,
                                                 const r1cs_ppzksnark_primary_input<ppT> &primary_input,
                                                 const r1cs_ppzksnark_auxiliary_input<ppT> &auxiliary_input)
 {
     libff::enter_block("Call to r1cs_ppzksnark_prover");
 
 #ifdef DEBUG
-    assert(pk.constraint_system.is_satisfied(primary_input, auxiliary_input));
+    assert(constraint_system.is_satisfied(primary_input, auxiliary_input));
 #endif
 
     const libff::Fr<ppT> d1 = libff::Fr<ppT>::random_element(),
@@ -442,12 +443,12 @@ r1cs_ppzksnark_proof<ppT> r1cs_ppzksnark_prover(const r1cs_ppzksnark_proving_key
         d3 = libff::Fr<ppT>::random_element();
 
     libff::enter_block("Compute the polynomial H");
-    const qap_witness<libff::Fr<ppT> > qap_wit = r1cs_to_qap_witness_map(pk.constraint_system, primary_input, auxiliary_input, d1, d2, d3);
+    const qap_witness<libff::Fr<ppT> > qap_wit = r1cs_to_qap_witness_map(constraint_system, primary_input, auxiliary_input, d1, d2, d3);
     libff::leave_block("Compute the polynomial H");
 
 #ifdef DEBUG
     const libff::Fr<ppT> t = libff::Fr<ppT>::random_element();
-    qap_instance_evaluation<libff::Fr<ppT> > qap_inst = r1cs_to_qap_instance_map_with_evaluation(pk.constraint_system, t);
+    qap_instance_evaluation<libff::Fr<ppT> > qap_inst = r1cs_to_qap_instance_map_with_evaluation(constraint_system, t);
     assert(qap_inst.is_satisfied(qap_wit));
 #endif
 

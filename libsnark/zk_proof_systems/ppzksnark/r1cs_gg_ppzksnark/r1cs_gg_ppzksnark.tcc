@@ -44,8 +44,8 @@ bool r1cs_gg_ppzksnark_proving_key<ppT>::operator==(const r1cs_gg_ppzksnark_prov
             this->A_query == other.A_query &&
             this->B_query == other.B_query &&
             this->H_query == other.H_query &&
-            this->L_query == other.L_query &&
-            this->constraint_system == other.constraint_system);
+            this->L_query == other.L_query
+            );
 }
 
 template<typename ppT>
@@ -60,7 +60,6 @@ std::ostream& operator<<(std::ostream &out, const r1cs_gg_ppzksnark_proving_key<
     out << pk.B_query;
     out << pk.H_query;
     out << pk.L_query;
-    out << pk.constraint_system;
 
     return out;
 }
@@ -82,7 +81,6 @@ std::istream& operator>>(std::istream &in, r1cs_gg_ppzksnark_proving_key<ppT> &p
     in >> pk.B_query;
     in >> pk.H_query;
     in >> pk.L_query;
-    in >> pk.constraint_system;
 
     return in;
 }
@@ -229,10 +227,16 @@ r1cs_gg_ppzksnark_keypair<ppT> r1cs_gg_ppzksnark_generator(const r1cs_gg_ppzksna
     /* A quadratic arithmetic program evaluated at t. */
     qap_instance_evaluation<libff::Fr<ppT> > qap = r1cs_to_qap_instance_map_with_evaluation(r1cs_copy, t);
 
-    libff::print_indent(); printf("* QAP number of variables: %zu\n", qap.num_variables());
-    libff::print_indent(); printf("* QAP pre degree: %zu\n", r1cs_copy.constraints.size());
-    libff::print_indent(); printf("* QAP degree: %zu\n", qap.degree());
-    libff::print_indent(); printf("* QAP number of input variables: %zu\n", qap.num_inputs());
+    if(!libff::inhibit_profiling_info) {
+        libff::print_indent();
+        printf("* QAP number of variables: %zu\n", qap.num_variables());
+        libff::print_indent();
+        printf("* QAP pre degree: %zu\n", r1cs_copy.constraints.size());
+        libff::print_indent();
+        printf("* QAP degree: %zu\n", qap.degree());
+        libff::print_indent();
+        printf("* QAP number of input variables: %zu\n", qap.num_inputs());
+    }
 
     libff::enter_block("Compute query densities");
     size_t non_zero_At = 0;
@@ -296,20 +300,26 @@ r1cs_gg_ppzksnark_keypair<ppT> r1cs_gg_ppzksnark_generator(const r1cs_gg_ppzksna
     libff::enter_block("Generating G1 MSM window table");
     const libff::G1<ppT> g1_generator = libff::G1<ppT>::random_element();
     const size_t g1_scalar_count = non_zero_At + non_zero_Bt + qap.num_variables();
-    const size_t g1_scalar_size = libff::Fr<ppT>::size_in_bits();
+    const size_t g1_scalar_size = libff::Fr<ppT>::ceil_size_in_bits();
     const size_t g1_window_size = libff::get_exp_window_size<libff::G1<ppT> >(g1_scalar_count);
 
-    libff::print_indent(); printf("* G1 window: %zu\n", g1_window_size);
+    if(!libff::inhibit_profiling_info) {
+        libff::print_indent();
+        printf("* G1 window: %zu\n", g1_window_size);
+    }
     libff::window_table<libff::G1<ppT> > g1_table = libff::get_window_table(g1_scalar_size, g1_window_size, g1_generator);
     libff::leave_block("Generating G1 MSM window table");
 
     libff::enter_block("Generating G2 MSM window table");
     const libff::G2<ppT> G2_gen = libff::G2<ppT>::random_element();
     const size_t g2_scalar_count = non_zero_Bt;
-    const size_t g2_scalar_size = libff::Fr<ppT>::size_in_bits();
+    const size_t g2_scalar_size = libff::Fr<ppT>::ceil_size_in_bits();
     size_t g2_window_size = libff::get_exp_window_size<libff::G2<ppT> >(g2_scalar_count);
 
-    libff::print_indent(); printf("* G2 window: %zu\n", g2_window_size);
+    if(!libff::inhibit_profiling_info) {
+        libff::print_indent();
+        printf("* G2 window: %zu\n", g2_window_size);
+    }
     libff::window_table<libff::G2<ppT> > g2_table = libff::get_window_table(g2_scalar_size, g2_window_size, G2_gen);
     libff::leave_block("Generating G2 MSM window table");
 
@@ -329,7 +339,7 @@ r1cs_gg_ppzksnark_keypair<ppT> r1cs_gg_ppzksnark_generator(const r1cs_gg_ppzksna
     libff::leave_block("Compute the A-query", false);
 
     libff::enter_block("Compute the B-query", false);
-    knowledge_commitment_vector<libff::G2<ppT>, libff::G1<ppT> > B_query = kc_batch_exp(libff::Fr<ppT>::size_in_bits(), g2_window_size, g1_window_size, g2_table, g1_table, libff::Fr<ppT>::one(), libff::Fr<ppT>::one(), Bt, chunks);
+    knowledge_commitment_vector<libff::G2<ppT>, libff::G1<ppT> > B_query = kc_batch_exp(libff::Fr<ppT>::ceil_size_in_bits(), g2_window_size, g1_window_size, g2_table, g1_table, libff::Fr<ppT>::one(), libff::Fr<ppT>::one(), Bt, chunks);
     // NOTE: if USE_MIXED_ADDITION is defined,
     // kc_batch_exp will convert its output to special form internally
     libff::leave_block("Compute the B-query", false);
@@ -378,8 +388,7 @@ r1cs_gg_ppzksnark_keypair<ppT> r1cs_gg_ppzksnark_generator(const r1cs_gg_ppzksna
                                                                                std::move(A_query),
                                                                                std::move(B_query),
                                                                                std::move(H_query),
-                                                                               std::move(L_query),
-                                                                               std::move(r1cs_copy));
+                                                                               std::move(L_query));
 
     pk.print_size();
     vk.print_size();
@@ -389,17 +398,18 @@ r1cs_gg_ppzksnark_keypair<ppT> r1cs_gg_ppzksnark_generator(const r1cs_gg_ppzksna
 
 template <typename ppT>
 r1cs_gg_ppzksnark_proof<ppT> r1cs_gg_ppzksnark_prover(const r1cs_gg_ppzksnark_proving_key<ppT> &pk,
+                                                      const r1cs_gg_ppzksnark_constraint_system<ppT> &constraint_system,
                                                       const r1cs_gg_ppzksnark_primary_input<ppT> &primary_input,
                                                       const r1cs_gg_ppzksnark_auxiliary_input<ppT> &auxiliary_input)
 {
     libff::enter_block("Call to r1cs_gg_ppzksnark_prover");
 
 #ifdef DEBUG
-    assert(pk.constraint_system.is_satisfied(primary_input, auxiliary_input));
+    assert(constraint_system.is_satisfied(primary_input, auxiliary_input));
 #endif
 
     libff::enter_block("Compute the polynomial H");
-    const qap_witness<libff::Fr<ppT> > qap_wit = r1cs_to_qap_witness_map(pk.constraint_system, primary_input, auxiliary_input, libff::Fr<ppT>::zero(), libff::Fr<ppT>::zero(), libff::Fr<ppT>::zero());
+    const qap_witness<libff::Fr<ppT> > qap_wit = r1cs_to_qap_witness_map(constraint_system, primary_input, auxiliary_input, libff::Fr<ppT>::zero(), libff::Fr<ppT>::zero(), libff::Fr<ppT>::zero());
 
     /* We are dividing degree 2(d-1) polynomial by degree d polynomial
        and not adding a PGHR-style ZK-patch, so our H is degree d-2 */
@@ -410,7 +420,7 @@ r1cs_gg_ppzksnark_proof<ppT> r1cs_gg_ppzksnark_prover(const r1cs_gg_ppzksnark_pr
 
 #ifdef DEBUG
     const libff::Fr<ppT> t = libff::Fr<ppT>::random_element();
-    qap_instance_evaluation<libff::Fr<ppT> > qap_inst = r1cs_to_qap_instance_map_with_evaluation(pk.constraint_system, t);
+    qap_instance_evaluation<libff::Fr<ppT> > qap_inst = r1cs_to_qap_instance_map_with_evaluation(constraint_system, t);
     assert(qap_inst.is_satisfied(qap_wit));
 #endif
 

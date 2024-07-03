@@ -324,13 +324,13 @@ void sp_compliance_step_pcd_circuit_maker<ppT>::generate_r1cs_witness(const r1cs
 template<typename ppT>
 size_t sp_compliance_step_pcd_circuit_maker<ppT>::field_logsize()
 {
-    return libff::Fr<ppT>::size_in_bits();
+    return libff::Fr<ppT>::ceil_size_in_bits();
 }
 
 template<typename ppT>
 size_t sp_compliance_step_pcd_circuit_maker<ppT>::field_capacity()
 {
-    return libff::Fr<ppT>::capacity();
+    return libff::Fr<ppT>::floor_size_in_bits();
 }
 
 template<typename ppT>
@@ -446,13 +446,13 @@ r1cs_auxiliary_input<libff::Fr<ppT> > sp_translation_step_pcd_circuit_maker<ppT>
 template<typename ppT>
 size_t sp_translation_step_pcd_circuit_maker<ppT>::field_logsize()
 {
-    return libff::Fr<ppT>::size_in_bits();
+    return libff::Fr<ppT>::ceil_size_in_bits();
 }
 
 template<typename ppT>
 size_t sp_translation_step_pcd_circuit_maker<ppT>::field_capacity()
 {
-    return libff::Fr<ppT>::capacity();
+    return libff::Fr<ppT>::floor_size_in_bits();
 }
 
 template<typename ppT>

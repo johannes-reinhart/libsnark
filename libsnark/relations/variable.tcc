@@ -20,7 +20,7 @@
 #include <algorithm>
 #include <cassert>
 
-#include <libff/algebra/fields/bigint.hpp>
+#include <libff/algebra/field_utils/bigint.hpp>
 
 namespace libsnark {
 
@@ -355,7 +355,7 @@ bool linear_combination<FieldT>::is_valid(const size_t num_variables) const
 
     /* check that the variables are in proper range. as the variables
        are sorted, it suffices to check the last term */
-    if ((--terms.end())->index >= num_variables)
+    if ((--terms.end())->index > num_variables)
     {
         return false;
     }

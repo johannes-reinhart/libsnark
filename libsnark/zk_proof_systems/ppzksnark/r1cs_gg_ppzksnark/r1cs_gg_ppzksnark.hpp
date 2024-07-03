@@ -80,8 +80,6 @@ public:
     libff::G1_vector<ppT> H_query;
     libff::G1_vector<ppT> L_query;
 
-    r1cs_gg_ppzksnark_constraint_system<ppT> constraint_system;
-
     r1cs_gg_ppzksnark_proving_key() {};
     r1cs_gg_ppzksnark_proving_key<ppT>& operator=(const r1cs_gg_ppzksnark_proving_key<ppT> &other) = default;
     r1cs_gg_ppzksnark_proving_key(const r1cs_gg_ppzksnark_proving_key<ppT> &other) = default;
@@ -94,8 +92,7 @@ public:
                                   libff::G1_vector<ppT> &&A_query,
                                   knowledge_commitment_vector<libff::G2<ppT>, libff::G1<ppT> > &&B_query,
                                   libff::G1_vector<ppT> &&H_query,
-                                  libff::G1_vector<ppT> &&L_query,
-                                  r1cs_gg_ppzksnark_constraint_system<ppT> &&constraint_system) :
+                                  libff::G1_vector<ppT> &&L_query) :
         alpha_g1(std::move(alpha_g1)),
         beta_g1(std::move(beta_g1)),
         beta_g2(std::move(beta_g2)),
@@ -104,9 +101,9 @@ public:
         A_query(std::move(A_query)),
         B_query(std::move(B_query)),
         H_query(std::move(H_query)),
-        L_query(std::move(L_query)),
-        constraint_system(std::move(constraint_system))
-    {};
+        L_query(std::move(L_query))
+        {};
+
 
     size_t G1_size() const
     {
@@ -130,13 +127,16 @@ public:
 
     size_t size_in_bits() const
     {
-        return (libff::size_in_bits(A_query) + B_query.size_in_bits() +
-                libff::size_in_bits(H_query) + libff::size_in_bits(L_query) +
+        return (libff::curve_size_in_bits(A_query) + B_query.size_in_bits() +
+                libff::curve_size_in_bits(H_query) + libff::curve_size_in_bits(L_query) +
                 1 * libff::G1<ppT>::size_in_bits() + 1 * libff::G2<ppT>::size_in_bits());
     }
 
     void print_size() const
     {
+        if(libff::inhibit_profiling_info) {
+            return;
+        }
         libff::print_indent(); printf("* G1 elements in PK: %zu\n", this->G1_size());
         libff::print_indent(); printf("* Non-zero G1 elements in PK: %zu\n", this->G1_sparse_size());
         libff::print_indent(); printf("* G2 elements in PK: %zu\n", this->G2_size());
@@ -207,6 +207,9 @@ public:
 
     void print_size() const
     {
+        if(libff::inhibit_profiling_info) {
+            return;
+        }
         libff::print_indent(); printf("* G1 elements in VK: %zu\n", this->G1_size());
         libff::print_indent(); printf("* G2 elements in VK: %zu\n", this->G2_size());
         libff::print_indent(); printf("* GT elements in VK: %zu\n", this->GT_size());
@@ -334,6 +337,9 @@ public:
 
     void print_size() const
     {
+        if(libff::inhibit_profiling_info) {
+            return;
+        }
         libff::print_indent(); printf("* G1 elements in proof: %zu\n", this->G1_size());
         libff::print_indent(); printf("* G2 elements in proof: %zu\n", this->G2_size());
         libff::print_indent(); printf("* Proof size in bits: %zu\n", this->size_in_bits());
@@ -372,6 +378,7 @@ r1cs_gg_ppzksnark_keypair<ppT> r1cs_gg_ppzksnark_generator(const r1cs_gg_ppzksna
  */
 template<typename ppT>
 r1cs_gg_ppzksnark_proof<ppT> r1cs_gg_ppzksnark_prover(const r1cs_gg_ppzksnark_proving_key<ppT> &pk,
+                                                      const r1cs_gg_ppzksnark_constraint_system<ppT> &constraint_system,
                                                       const r1cs_gg_ppzksnark_primary_input<ppT> &primary_input,
                                                       const r1cs_gg_ppzksnark_auxiliary_input<ppT> &auxiliary_input);
 

@@ -99,7 +99,9 @@ bool run_r1cs_gg_ppzksnark(const r1cs_example<libff::Fr<ppT> > &example,
     printf("* The verification result is: %s\n", (ans ? "PASS" : "FAIL"));
 
     libff::print_header("R1CS GG-ppzkSNARK Online Verifier");
+#ifndef NDEBUG
     const bool ans2 = r1cs_gg_ppzksnark_online_verifier_strong_IC<ppT>(pvk, example.primary_input, proof);
+#endif
     assert(ans == ans2);
 
     test_affine_verifier<ppT>(keypair.vk, example.primary_input, proof, ans);

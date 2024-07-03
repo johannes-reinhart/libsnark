@@ -104,8 +104,6 @@ public:
     // G^{gamma^2 * Z(t) * t^i} for 0 <= i < sap.degree
     libff::G1_vector<ppT> G_gamma2_Z_t;
 
-    r1cs_se_ppzksnark_constraint_system<ppT> constraint_system;
-
     r1cs_se_ppzksnark_proving_key() {};
     r1cs_se_ppzksnark_proving_key<ppT>& operator=(const r1cs_se_ppzksnark_proving_key<ppT> &other) = default;
     r1cs_se_ppzksnark_proving_key(const r1cs_se_ppzksnark_proving_key<ppT> &other) = default;
@@ -118,8 +116,7 @@ public:
         libff::G2<ppT> &H_gamma_Z,
         libff::G1<ppT> &G_ab_gamma_Z,
         libff::G1<ppT> &G_gamma2_Z2,
-        libff::G1_vector<ppT> &&G_gamma2_Z_t,
-        r1cs_se_ppzksnark_constraint_system<ppT> &&constraint_system) :
+        libff::G1_vector<ppT> &&G_gamma2_Z_t) :
         A_query(std::move(A_query)),
         B_query(std::move(B_query)),
         C_query_1(std::move(C_query_1)),
@@ -128,8 +125,7 @@ public:
         H_gamma_Z(H_gamma_Z),
         G_ab_gamma_Z(G_ab_gamma_Z),
         G_gamma2_Z2(G_gamma2_Z2),
-        G_gamma2_Z_t(std::move(G_gamma2_Z_t)),
-        constraint_system(std::move(constraint_system))
+        G_gamma2_Z_t(std::move(G_gamma2_Z_t))
     {};
 
     size_t G1_size() const
@@ -231,6 +227,9 @@ public:
 
     void print_size() const
     {
+        if(libff::inhibit_profiling_info) {
+            return;
+        }
         libff::print_indent(); printf("* G1 elements in VK: %zu\n",
             this->G1_size());
         libff::print_indent(); printf("* G2 elements in VK: %zu\n",
@@ -357,6 +356,9 @@ public:
 
     void print_size() const
     {
+        if(libff::inhibit_profiling_info) {
+            return;
+        }
         libff::print_indent(); printf("* G1 elements in proof: %zu\n",
             this->G1_size());
         libff::print_indent(); printf("* G2 elements in proof: %zu\n",
@@ -397,6 +399,7 @@ r1cs_se_ppzksnark_keypair<ppT> r1cs_se_ppzksnark_generator(const r1cs_se_ppzksna
  */
 template<typename ppT>
 r1cs_se_ppzksnark_proof<ppT> r1cs_se_ppzksnark_prover(const r1cs_se_ppzksnark_proving_key<ppT> &pk,
+                                                      const r1cs_se_ppzksnark_constraint_system<ppT> &constraint_system,
                                                       const r1cs_se_ppzksnark_primary_input<ppT> &primary_input,
                                                       const r1cs_se_ppzksnark_auxiliary_input<ppT> &auxiliary_input);
 

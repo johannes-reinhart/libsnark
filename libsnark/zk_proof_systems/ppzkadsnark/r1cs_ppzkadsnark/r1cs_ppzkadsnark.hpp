@@ -284,11 +284,14 @@ public:
 
     size_t size_in_bits() const
     {
-        return A_query.size_in_bits() + B_query.size_in_bits() + C_query.size_in_bits() + libff::size_in_bits(H_query) + libff::size_in_bits(K_query) + libff::G1<snark_pp<ppT>>::size_in_bits();
+        return A_query.size_in_bits() + B_query.size_in_bits() + C_query.size_in_bits() + libff::curve_size_in_bits(H_query) + libff::curve_size_in_bits(K_query) + libff::G1<snark_pp<ppT>>::size_in_bits();
     }
 
     void print_size() const
     {
+        if(libff::inhibit_profiling_info) {
+            return;
+        }
         libff::print_indent(); printf("* G1 elements in PK: %zu\n", this->G1_size());
         libff::print_indent(); printf("* Non-zero G1 elements in PK: %zu\n", this->G1_sparse_size());
         libff::print_indent(); printf("* G2 elements in PK: %zu\n", this->G2_size());
@@ -368,6 +371,9 @@ public:
 
     void print_size() const
     {
+        if(libff::inhibit_profiling_info) {
+            return;
+        }
         libff::print_indent(); printf("* G1 elements in VK: %zu\n", this->G1_size());
         libff::print_indent(); printf("* G2 elements in VK: %zu\n", this->G2_size());
         libff::print_indent(); printf("* VK size in bits: %zu\n", this->size_in_bits());
@@ -527,6 +533,9 @@ public:
 
     void print_size() const
     {
+        if(libff::inhibit_profiling_info) {
+            return;
+        }
         libff::print_indent(); printf("* G1 elements in proof: %zu\n", this->G1_size());
         libff::print_indent(); printf("* G2 elements in proof: %zu\n", this->G2_size());
         libff::print_indent(); printf("* Proof size in bits: %zu\n", this->size_in_bits());

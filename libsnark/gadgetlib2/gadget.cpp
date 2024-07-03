@@ -306,7 +306,7 @@ R1P_InnerProduct_Gadget::R1P_InnerProduct_Gadget(ProtoboardPtr pb,
                                                  const VariableArray& A,
                                                  const VariableArray& B,
                                                  const Variable& result)
-        : Gadget(pb), InnerProduct_GadgetBase(pb), R1P_Gadget(pb), partialSums_(A.size(),
+        : Gadget(pb), InnerProduct_GadgetBase(pb), R1P_Gadget(pb), partialSums_(A.size()-1,
           "partialSums"), A_(A), B_(B), result_(result) {
     GADGETLIB_ASSERT(A.size() > 0, "Attempted to create an R1P_InnerProduct_Gadget with 0 inputs.");
     GADGETLIB_ASSERT(A.size() == B.size(), GADGETLIB2_FMT("Inner product vector sizes not equal. Sizes are: "
