@@ -387,7 +387,7 @@ public:
  * Given a R1CS constraint system CS, this algorithm produces proving and verification keys for CS.
  */
 template<typename ppT>
-r1cs_se_ppzksnark_keypair<ppT> r1cs_se_ppzksnark_generator(const r1cs_se_ppzksnark_constraint_system<ppT> &cs);
+r1cs_se_ppzksnark_keypair<ppT> r1cs_se_ppzksnark_generator(r1cs_se_ppzksnark_constraint_system<ppT> &cs);
 
 /**
  * A prover algorithm for the R1CS SEppzkSNARK.

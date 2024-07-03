@@ -237,21 +237,20 @@ r1cs_ppzksnark_verification_key<ppT> r1cs_ppzksnark_verification_key<ppT>::dummy
 }
 
 template <typename ppT>
-r1cs_ppzksnark_keypair<ppT> r1cs_ppzksnark_generator(const r1cs_ppzksnark_constraint_system<ppT> &cs)
+r1cs_ppzksnark_keypair<ppT> r1cs_ppzksnark_generator(r1cs_ppzksnark_constraint_system<ppT> &cs)
 {
     libff::enter_block("Call to r1cs_ppzksnark_generator");
 
     /* make the B_query "lighter" if possible */
-    r1cs_ppzksnark_constraint_system<ppT> cs_copy(cs);
-    cs_copy.swap_AB_if_beneficial();
+    cs.swap_AB_if_beneficial();
 
     /* draw random element at which the QAP is evaluated */
     const  libff::Fr<ppT> t = libff::Fr<ppT>::random_element();
 
-    qap_instance_evaluation<libff::Fr<ppT> > qap_inst = r1cs_to_qap_instance_map_with_evaluation(cs_copy, t);
+    qap_instance_evaluation<libff::Fr<ppT> > qap_inst = r1cs_to_qap_instance_map_with_evaluation(cs, t);
 
     libff::print_indent(); printf("* QAP number of variables: %zu\n", qap_inst.num_variables());
-    libff::print_indent(); printf("* QAP pre degree: %zu\n", cs_copy.constraints.size());
+    libff::print_indent(); printf("* QAP pre degree: %zu\n", cs.constraints.size());
     libff::print_indent(); printf("* QAP degree: %zu\n", qap_inst.degree());
     libff::print_indent(); printf("* QAP number of input variables: %zu\n", qap_inst.num_inputs());
 

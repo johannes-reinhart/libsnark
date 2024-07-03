@@ -187,6 +187,7 @@ if("${WITH_SUPERCOP}")
 
     snark_adsnark
   )
+  target_link_options(demo_r1cs_ppzkadsnark PRIVATE "-no-pie")
 endif()
 
 # Profiling
@@ -284,6 +285,61 @@ target_link_libraries(
   profile_r1cs_gg_ppzksnark
 
   snark
+)
+
+add_executable(
+        profile_r1cs_gg_ppadscsnark
+        EXCLUDE_FROM_ALL
+
+        zk_proof_systems/ppadscsnark/r1cs_gg_ppadscsnark/profiling/profile_r1cs_gg_ppadscsnark.cpp
+)
+target_link_libraries(
+        profile_r1cs_gg_ppadscsnark
+
+        ${Boost_LIBRARIES}
+        snark
+)
+
+add_executable(
+        profile_r1cs_gg_ppzkadscsnark
+        EXCLUDE_FROM_ALL
+
+        zk_proof_systems/ppadscsnark/r1cs_gg_ppzkadscsnark/profiling/profile_r1cs_gg_ppzkadscsnark.cpp
+)
+target_link_libraries(
+        profile_r1cs_gg_ppzkadscsnark
+
+        ${Boost_LIBRARIES}
+        snark
+)
+
+if("${WITH_SUPERCOP}")
+  add_executable(
+          profile_r1cs_ppzkadsnark
+          EXCLUDE_FROM_ALL
+
+          zk_proof_systems/ppzkadsnark/r1cs_ppzkadsnark/profiling/profile_r1cs_ppzkadsnark.cpp
+  )
+  target_link_libraries(
+          profile_r1cs_ppzkadsnark
+
+          ${Boost_LIBRARIES}
+          snark_adsnark
+  )
+  target_link_options(profile_r1cs_ppzkadsnark PRIVATE "-no-pie")
+endif()
+
+add_executable(
+        profile_sc_lego_gro16
+        EXCLUDE_FROM_ALL
+
+        zk_proof_systems/ppzksnark/legogro16/profiling/profile_sc_legogro16.cpp
+)
+target_link_libraries(
+        profile_sc_lego_gro16
+
+        ${Boost_LIBRARIES}
+        snark
 )
 
 add_executable(
@@ -581,6 +637,54 @@ target_link_libraries(
 )
 
 add_executable(
+        zk_proof_systems_r1cs_gg_ppadscsnark_test
+        EXCLUDE_FROM_ALL
+
+        zk_proof_systems/ppadscsnark/r1cs_gg_ppadscsnark/tests/test_r1cs_gg_ppadscsnark.cpp
+)
+target_link_libraries(
+        zk_proof_systems_r1cs_gg_ppadscsnark_test
+
+        snark
+)
+
+add_executable(
+        zk_proof_systems_r1cs_gg_ppzkadscsnark_test
+        EXCLUDE_FROM_ALL
+
+        zk_proof_systems/ppadscsnark/r1cs_gg_ppzkadscsnark/tests/test_r1cs_gg_ppzkadscsnark.cpp
+)
+target_link_libraries(
+        zk_proof_systems_r1cs_gg_ppzkadscsnark_test
+
+        snark
+)
+
+add_executable(
+        zk_proof_systems_lego_gro16_test
+        EXCLUDE_FROM_ALL
+
+        zk_proof_systems/ppzksnark/legogro16/tests/test_lego_gro16.cpp
+)
+target_link_libraries(
+        zk_proof_systems_lego_gro16_test
+
+        snark
+)
+
+add_executable(
+        zk_proof_systems_lego_gro16_sc_test
+        EXCLUDE_FROM_ALL
+
+        zk_proof_systems/ppzksnark/legogro16/tests/test_lego_gro16_sc.cpp
+)
+target_link_libraries(
+        zk_proof_systems_lego_gro16_sc_test
+
+        snark
+)
+
+add_executable(
   zk_proof_systems_ram_ppzksnark_test
   EXCLUDE_FROM_ALL
 
@@ -676,6 +780,18 @@ target_link_libraries(
   snark
 )
 
+add_executable(
+        test_r1cs_to_r1cs
+        EXCLUDE_FROM_ALL
+
+        reductions/tests/test_r1cs_to_r1cs.cpp
+)
+target_link_libraries(
+        test_r1cs_to_r1cs
+
+        snark
+)
+
 include(CTest)
 add_test(
   NAME common_routing_algorithms_test
@@ -742,6 +858,22 @@ add_test(
   COMMAND zk_proof_systems_r1cs_gg_ppzksnark_test
 )
 add_test(
+        NAME zk_proof_systems_r1cs_gg_ppadscsnark_test
+        COMMAND zk_proof_systems_r1cs_gg_ppadscsnark_test
+)
+add_test(
+        NAME zk_proof_systems_r1cs_gg_ppzkadscsnark_test
+        COMMAND zk_proof_systems_r1cs_gg_ppzkadscsnark_test
+)
+add_test(
+        NAME zk_proof_systems_lego_gro16_test
+        COMMAND zk_proof_systems_lego_gro16_test
+)
+add_test(
+        NAME zk_proof_systems_lego_gro16_sc_test
+        COMMAND zk_proof_systems_lego_gro16_sc_test
+)
+add_test(
   NAME zk_proof_systems_ram_ppzksnark_test
   COMMAND zk_proof_systems_ram_ppzksnark_test
 )
@@ -769,6 +901,10 @@ add_test(
   NAME test_sha256_gadget
   COMMAND test_sha256_gadget
 )
+add_test(
+        NAME test_r1cs_to_r1cs
+        COMMAND test_r1cs_to_r1cs
+)
 
 add_dependencies(check common_routing_algorithms_test)
 add_dependencies(check gadgetlib1_simple_test)
@@ -786,6 +922,10 @@ add_dependencies(check zk_proof_systems_bacs_ppzksnark_test)
 add_dependencies(check zk_proof_systems_r1cs_ppzksnark_test)
 add_dependencies(check zk_proof_systems_r1cs_se_ppzksnark_test)
 add_dependencies(check zk_proof_systems_r1cs_gg_ppzksnark_test)
+add_dependencies(check zk_proof_systems_r1cs_gg_ppadscsnark_test)
+add_dependencies(check zk_proof_systems_r1cs_gg_ppzkadscsnark_test)
+add_dependencies(check zk_proof_systems_lego_gro16_test)
+add_dependencies(check zk_proof_systems_lego_gro16_sc_test)
 add_dependencies(check zk_proof_systems_ram_ppzksnark_test)
 add_dependencies(check zk_proof_systems_tbcs_ppzksnark_test)
 add_dependencies(check zk_proof_systems_uscs_ppzksnark_test)
@@ -793,6 +933,8 @@ add_dependencies(check test_knapsack_gadget)
 add_dependencies(check test_merkle_tree_gadgets)
 add_dependencies(check test_set_commitment_gadget)
 add_dependencies(check test_sha256_gadget)
+add_dependencies(check test_r1cs_to_r1cs)
+
 
 # TODO (howardwu): Resolve runtime on targets:
 # gadgetlib1_fooram_test, zk_proof_systems_r1cs_mp_ppzkpcd_test, zk_proof_systems_r1cs_sp_ppzkpcd_test, zk_proof_systems_ram_zksnark_test

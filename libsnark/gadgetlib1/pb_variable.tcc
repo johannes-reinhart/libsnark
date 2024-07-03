@@ -12,6 +12,7 @@
 #include <libff/common/utils.hpp>
 
 #include <libsnark/gadgetlib1/protoboard.hpp>
+#include <libsnark/gadgetlib1/protoboard_structured.hpp>
 
 namespace libsnark {
 
@@ -19,6 +20,12 @@ template<typename FieldT>
 void pb_variable<FieldT>::allocate(protoboard<FieldT> &pb, const std::string &annotation)
 {
     this->index = pb.allocate_var_index(annotation);
+}
+
+template<typename FieldT>
+void pb_variable<FieldT>::allocate_from_block(structured_protoboard<FieldT> &pb, size_t block_id, const std::string &annotation)
+{
+    this->index = pb.allocate_block_var_index(block_id, annotation);
 }
 
 /* allocates pb_variable<FieldT> array in MSB->LSB order */
@@ -33,6 +40,21 @@ void pb_variable_array<FieldT>::allocate(protoboard<FieldT> &pb, const size_t n,
     for (size_t i = 0; i < n; ++i)
     {
         (*this)[i].allocate(pb, FMT(annotation_prefix, "_%zu", i));
+    }
+}
+
+/* allocates pb_variable<FieldT> array in MSB->LSB order */
+template<typename FieldT>
+void pb_variable_array<FieldT>::allocate_from_block(structured_protoboard<FieldT> &pb, const size_t block_id, const size_t n, const std::string &annotation_prefix)
+{
+#ifdef DEBUG
+    assert(annotation_prefix != "");
+#endif
+    (*this).resize(n);
+
+    for (size_t i = 0; i < n; ++i)
+    {
+        (*this)[i].allocate_from_block(pb, block_id, FMT(annotation_prefix, "_%zu", i));
     }
 }
 
@@ -124,6 +146,14 @@ pb_linear_combination<FieldT>::pb_linear_combination(const pb_variable<FieldT> &
     this->is_variable = true;
     this->index = var.index;
     this->terms.emplace_back(linear_term<FieldT>(var));
+}
+
+template<typename FieldT>
+pb_linear_combination<FieldT>::pb_linear_combination(protoboard<FieldT> &pb, const linear_combination<FieldT> &lc)
+{
+    this->is_variable = false;
+    this->assign(pb, lc);
+    this->evaluate(pb); // Convenient, if lc is just a constant, then no need to reevaluate in every witness generation
 }
 
 template<typename FieldT>

@@ -207,13 +207,12 @@ r1cs_gg_ppzksnark_verification_key<ppT> r1cs_gg_ppzksnark_verification_key<ppT>:
 }
 
 template <typename ppT>
-r1cs_gg_ppzksnark_keypair<ppT> r1cs_gg_ppzksnark_generator(const r1cs_gg_ppzksnark_constraint_system<ppT> &r1cs)
+r1cs_gg_ppzksnark_keypair<ppT> r1cs_gg_ppzksnark_generator(r1cs_gg_ppzksnark_constraint_system<ppT> &r1cs)
 {
     libff::enter_block("Call to r1cs_gg_ppzksnark_generator");
 
     /* Make the B_query "lighter" if possible */
-    r1cs_gg_ppzksnark_constraint_system<ppT> r1cs_copy(r1cs);
-    r1cs_copy.swap_AB_if_beneficial();
+    r1cs.swap_AB_if_beneficial();
 
     /* Generate secret randomness */
     const libff::Fr<ppT> t = libff::Fr<ppT>::random_element();
@@ -225,13 +224,13 @@ r1cs_gg_ppzksnark_keypair<ppT> r1cs_gg_ppzksnark_generator(const r1cs_gg_ppzksna
     const libff::Fr<ppT> delta_inverse = delta.inverse();
 
     /* A quadratic arithmetic program evaluated at t. */
-    qap_instance_evaluation<libff::Fr<ppT> > qap = r1cs_to_qap_instance_map_with_evaluation(r1cs_copy, t);
+    qap_instance_evaluation<libff::Fr<ppT> > qap = r1cs_to_qap_instance_map_with_evaluation(r1cs, t);
 
     if(!libff::inhibit_profiling_info) {
         libff::print_indent();
         printf("* QAP number of variables: %zu\n", qap.num_variables());
         libff::print_indent();
-        printf("* QAP pre degree: %zu\n", r1cs_copy.constraints.size());
+        printf("* QAP pre degree: %zu\n", r1cs.constraints.size());
         libff::print_indent();
         printf("* QAP degree: %zu\n", qap.degree());
         libff::print_indent();

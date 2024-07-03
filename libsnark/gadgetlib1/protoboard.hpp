@@ -29,7 +29,7 @@ class r1cs_constraint_system;
 
 template<typename FieldT>
 class protoboard {
-private:
+protected:
     FieldT constant_term; /* only here, because pb.val() needs to be able to return reference to the constant 1 term */
     r1cs_variable_assignment<FieldT> values; /* values[0] will hold the value of the first allocated variable of the protoboard, *NOT* constant 1 */
     var_index_t next_free_var;
@@ -67,7 +67,7 @@ public:
     friend class pb_variable<FieldT>;
     friend class pb_linear_combination<FieldT>;
 
-private:
+protected:
     var_index_t allocate_var_index(const std::string &annotation="");
     lc_index_t allocate_lc_index();
 };

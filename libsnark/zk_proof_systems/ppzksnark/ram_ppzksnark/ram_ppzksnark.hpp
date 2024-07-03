@@ -74,6 +74,7 @@ public:
     typedef ram_ppzksnark_snark_pp<ram_ppzksnark_ppT> snark_ppT;
 
     r1cs_ppzksnark_proving_key<snark_ppT> r1cs_pk;
+    r1cs_ppzksnark_constraint_system<snark_ppT> r1cs_cs;
     ram_ppzksnark_architecture_params<ram_ppzksnark_ppT> ap;
     size_t primary_input_size_bound;
     size_t time_bound;
@@ -82,10 +83,12 @@ public:
     ram_ppzksnark_proving_key(const ram_ppzksnark_proving_key<ram_ppzksnark_ppT> &other) = default;
     ram_ppzksnark_proving_key(ram_ppzksnark_proving_key<ram_ppzksnark_ppT> &&other) = default;
     ram_ppzksnark_proving_key(r1cs_ppzksnark_proving_key<snark_ppT> &&r1cs_pk,
+                              r1cs_ppzksnark_constraint_system<snark_ppT> &&r1cs_cs,
                               const ram_ppzksnark_architecture_params<ram_ppzksnark_ppT> &ap,
                               const size_t primary_input_size_bound,
                               const size_t time_bound) :
         r1cs_pk(std::move(r1cs_pk)),
+        r1cs_cs(std::move(r1cs_cs)),
         ap(ap),
         primary_input_size_bound(primary_input_size_bound),
         time_bound(time_bound)

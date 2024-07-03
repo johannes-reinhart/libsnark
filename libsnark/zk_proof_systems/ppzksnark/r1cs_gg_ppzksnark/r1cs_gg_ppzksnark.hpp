@@ -107,29 +107,29 @@ public:
 
     size_t G1_size() const
     {
-        return 1 + A_query.size() + B_query.domain_size() + H_query.size() + L_query.size();
+        return 3 + A_query.size() + B_query.domain_size() + H_query.size() + L_query.size();
     }
 
     size_t G2_size() const
     {
-        return 1 + B_query.domain_size();
+        return 2 + B_query.domain_size();
     }
 
     size_t G1_sparse_size() const
     {
-        return 1 + A_query.size() + B_query.size() + H_query.size() + L_query.size();
+        return 3 + A_query.size() + B_query.size() + H_query.size() + L_query.size();
     }
 
     size_t G2_sparse_size() const
     {
-        return 1 + B_query.size();
+        return 2 + B_query.size();
     }
 
     size_t size_in_bits() const
     {
         return (libff::curve_size_in_bits(A_query) + B_query.size_in_bits() +
                 libff::curve_size_in_bits(H_query) + libff::curve_size_in_bits(L_query) +
-                1 * libff::G1<ppT>::size_in_bits() + 1 * libff::G2<ppT>::size_in_bits());
+                3 * libff::G1<ppT>::size_in_bits() + 2 * libff::G2<ppT>::size_in_bits());
     }
 
     void print_size() const
@@ -201,8 +201,7 @@ public:
 
     size_t size_in_bits() const
     {
-        // TODO: include GT size
-        return (gamma_ABC_g1.size_in_bits() + 2 * libff::G2<ppT>::size_in_bits());
+        return (gamma_ABC_g1.size_in_bits() + 2 * libff::G2<ppT>::size_in_bits() + 1 * libff::GT<ppT>::ceil_size_in_bits());
     }
 
     void print_size() const
@@ -366,7 +365,7 @@ public:
  * Given a R1CS constraint system CS, this algorithm produces proving and verification keys for CS.
  */
 template<typename ppT>
-r1cs_gg_ppzksnark_keypair<ppT> r1cs_gg_ppzksnark_generator(const r1cs_gg_ppzksnark_constraint_system<ppT> &cs);
+r1cs_gg_ppzksnark_keypair<ppT> r1cs_gg_ppzksnark_generator(r1cs_gg_ppzksnark_constraint_system<ppT> &cs);
 
 /**
  * A prover algorithm for the R1CS GG-ppzkSNARK.

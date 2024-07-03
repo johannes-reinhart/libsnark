@@ -31,7 +31,7 @@ std::ostream& operator<<(std::ostream &out, const bacs_ppzksnark_proving_key<ppT
 {
     out << pk.circuit << OUTPUT_NEWLINE;
     out << pk.r1cs_pk << OUTPUT_NEWLINE;
-
+    out << pk.r1cs_cs << OUTPUT_NEWLINE;
     return out;
 }
 
@@ -41,6 +41,8 @@ std::istream& operator>>(std::istream &in, bacs_ppzksnark_proving_key<ppT> &pk)
     in >> pk.circuit;
     libff::consume_OUTPUT_NEWLINE(in);
     in >> pk.r1cs_pk;
+    libff::consume_OUTPUT_NEWLINE(in);
+    in >> pk.r1cs_cs;
     libff::consume_OUTPUT_NEWLINE(in);
 
     return in;
@@ -53,11 +55,11 @@ bacs_ppzksnark_keypair<ppT> bacs_ppzksnark_generator(const bacs_ppzksnark_circui
     typedef libff::Fr<ppT> FieldT;
 
     libff::enter_block("Call to bacs_ppzksnark_generator");
-    const r1cs_constraint_system<FieldT> r1cs_cs = bacs_to_r1cs_instance_map<FieldT>(circuit);
+    r1cs_constraint_system<FieldT> r1cs_cs = bacs_to_r1cs_instance_map<FieldT>(circuit);
     const r1cs_ppzksnark_keypair<ppT> r1cs_keypair = r1cs_ppzksnark_generator<ppT>(r1cs_cs);
     libff::leave_block("Call to bacs_ppzksnark_generator");
 
-    return bacs_ppzksnark_keypair<ppT>(bacs_ppzksnark_proving_key<ppT>(circuit, r1cs_keypair.pk),
+    return bacs_ppzksnark_keypair<ppT>(bacs_ppzksnark_proving_key<ppT>(circuit, r1cs_keypair.pk, r1cs_cs),
                                        r1cs_keypair.vk);
 }
 
@@ -71,7 +73,7 @@ bacs_ppzksnark_proof<ppT> bacs_ppzksnark_prover(const bacs_ppzksnark_proving_key
     libff::enter_block("Call to bacs_ppzksnark_prover");
     const r1cs_variable_assignment<FieldT> r1cs_va = bacs_to_r1cs_witness_map<FieldT>(pk.circuit, primary_input, auxiliary_input);
     const r1cs_auxiliary_input<FieldT> r1cs_ai(r1cs_va.begin() + primary_input.size(), r1cs_va.end()); // TODO: faster to just change bacs_to_r1cs_witness_map into two :(
-    const r1cs_ppzksnark_proof<ppT> r1cs_proof = r1cs_ppzksnark_prover<ppT>(pk.r1cs_pk, primary_input, r1cs_ai);
+    const r1cs_ppzksnark_proof<ppT> r1cs_proof = r1cs_ppzksnark_prover<ppT>(pk.r1cs_pk, pk.r1cs_cs, primary_input, r1cs_ai);
     libff::leave_block("Call to bacs_ppzksnark_prover");
 
     return r1cs_proof;

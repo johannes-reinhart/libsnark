@@ -45,7 +45,7 @@ void test_verifier(const std::string &annotation_A, const std::string &annotatio
 
     assert(example.constraint_system.is_satisfied(example.primary_input, example.auxiliary_input));
     const r1cs_ppzksnark_keypair<ppT_A> keypair = r1cs_ppzksnark_generator<ppT_A>(example.constraint_system);
-    const r1cs_ppzksnark_proof<ppT_A> pi = r1cs_ppzksnark_prover<ppT_A>(keypair.pk, example.primary_input, example.auxiliary_input);
+    const r1cs_ppzksnark_proof<ppT_A> pi = r1cs_ppzksnark_prover<ppT_A>(keypair.pk, example.constraint_system, example.primary_input, example.auxiliary_input);
     bool bit = r1cs_ppzksnark_verifier_strong_IC<ppT_A>(keypair.vk, example.primary_input, pi);
     assert(bit);
 
@@ -117,7 +117,7 @@ void test_hardcoded_verifier(const std::string &annotation_A, const std::string 
 
     assert(example.constraint_system.is_satisfied(example.primary_input, example.auxiliary_input));
     const r1cs_ppzksnark_keypair<ppT_A> keypair = r1cs_ppzksnark_generator<ppT_A>(example.constraint_system);
-    const r1cs_ppzksnark_proof<ppT_A> pi = r1cs_ppzksnark_prover<ppT_A>(keypair.pk, example.primary_input, example.auxiliary_input);
+    const r1cs_ppzksnark_proof<ppT_A> pi = r1cs_ppzksnark_prover<ppT_A>(keypair.pk, example.constraint_system, example.primary_input, example.auxiliary_input);
     bool bit = r1cs_ppzksnark_verifier_strong_IC<ppT_A>(keypair.vk, example.primary_input, pi);
     assert(bit);
 

@@ -237,8 +237,6 @@ public:
     /* Now come the additional elements for ad */
     libff::G1<snark_pp<ppT>> rA_i_Z_g1;
 
-    r1cs_ppzkadsnark_constraint_system<ppT> constraint_system;
-
     r1cs_ppzkadsnark_proving_key() {};
     r1cs_ppzkadsnark_proving_key<ppT>& operator=(const r1cs_ppzkadsnark_proving_key<ppT> &other) = default;
     r1cs_ppzkadsnark_proving_key(const r1cs_ppzkadsnark_proving_key<ppT> &other) = default;
@@ -251,15 +249,13 @@ public:
                                  libff::G1<snark_pp<ppT>> > &&C_query,
                                  libff::G1_vector<snark_pp<ppT>> &&H_query,
                                  libff::G1_vector<snark_pp<ppT>> &&K_query,
-                                 libff::G1<snark_pp<ppT>> &&rA_i_Z_g1,
-                                 r1cs_ppzkadsnark_constraint_system<ppT> &&constraint_system) :
+                                 libff::G1<snark_pp<ppT>> &&rA_i_Z_g1) :
         A_query(std::move(A_query)),
         B_query(std::move(B_query)),
         C_query(std::move(C_query)),
         H_query(std::move(H_query)),
         K_query(std::move(K_query)),
-        rA_i_Z_g1(std::move(rA_i_Z_g1)),
-        constraint_system(std::move(constraint_system))
+        rA_i_Z_g1(std::move(rA_i_Z_g1))
     {};
 
     size_t G1_size() const
@@ -596,7 +592,7 @@ bool r1cs_ppzkadsnark_auth_verify(const std::vector<libff::Fr<snark_pp<ppT>>> &d
  * Given a R1CS constraint system CS, this algorithm produces proving and verification keys for CS.
  */
 template<typename ppT>
-r1cs_ppzkadsnark_keypair<ppT> r1cs_ppzkadsnark_generator(const r1cs_ppzkadsnark_constraint_system<ppT> &cs,
+r1cs_ppzkadsnark_keypair<ppT> r1cs_ppzkadsnark_generator(r1cs_ppzkadsnark_constraint_system<ppT> &cs,
                                                          const r1cs_ppzkadsnark_pub_auth_prms<ppT> &prms);
 
 /**
@@ -609,6 +605,7 @@ r1cs_ppzkadsnark_keypair<ppT> r1cs_ppzkadsnark_generator(const r1cs_ppzkadsnark_
  */
 template<typename ppT>
 r1cs_ppzkadsnark_proof<ppT> r1cs_ppzkadsnark_prover(const r1cs_ppzkadsnark_proving_key<ppT> &pk,
+                                                    const r1cs_ppzkadsnark_constraint_system<ppT> &constraint_system,
                                                     const r1cs_ppzkadsnark_primary_input<ppT> &primary_input,
                                                     const r1cs_ppzkadsnark_auxiliary_input<ppT> &auxiliary_input,
                                                     const std::vector<r1cs_ppzkadsnark_auth_data<ppT>> &auth_data);

@@ -34,6 +34,7 @@ std::ostream& operator<<(std::ostream &out, const ram_ppzksnark_proving_key<ram_
 {
     out << pk.r1cs_pk;
     out << pk.ap;
+    out << pk.r1cs_cs;
     out << pk.primary_input_size_bound << "\n";
     out << pk.time_bound << "\n";
 
@@ -45,6 +46,7 @@ std::istream& operator>>(std::istream &in, ram_ppzksnark_proving_key<ram_ppzksna
 {
     in >> pk.r1cs_pk;
     in >> pk.ap;
+    in >> pk.r1cs_cs;
     in >> pk.primary_input_size_bound;
     libff::consume_newline(in);
     in >> pk.time_bound;
@@ -126,10 +128,11 @@ ram_ppzksnark_keypair<ram_ppzksnark_ppT> ram_ppzksnark_generator(const ram_ppzks
     libff::enter_block("Call to ram_ppzksnark_generator");
     ram_to_r1cs<ram_ppT> universal_r1cs(ap, primary_input_size_bound, time_bound);
     universal_r1cs.instance_map();
-    r1cs_ppzksnark_keypair<snark_ppT> ppzksnark_keypair = r1cs_ppzksnark_generator<snark_ppT>(universal_r1cs.get_constraint_system());
+    r1cs_ppzksnark_constraint_system<snark_ppT> constraint_system = universal_r1cs.get_constraint_system();
+    r1cs_ppzksnark_keypair<snark_ppT> ppzksnark_keypair = r1cs_ppzksnark_generator<snark_ppT>(constraint_system);
     libff::leave_block("Call to ram_ppzksnark_generator");
 
-    ram_ppzksnark_proving_key<ram_ppzksnark_ppT> pk = ram_ppzksnark_proving_key<ram_ppzksnark_ppT>(std::move(ppzksnark_keypair.pk), ap, primary_input_size_bound, time_bound);
+    ram_ppzksnark_proving_key<ram_ppzksnark_ppT> pk = ram_ppzksnark_proving_key<ram_ppzksnark_ppT>(std::move(ppzksnark_keypair.pk), std::move(constraint_system), ap, primary_input_size_bound, time_bound);
     ram_ppzksnark_verification_key<ram_ppzksnark_ppT> vk = ram_ppzksnark_verification_key<ram_ppzksnark_ppT>(std::move(ppzksnark_keypair.vk), ap, primary_input_size_bound, time_bound);
 
     return ram_ppzksnark_keypair<ram_ppzksnark_ppT>(std::move(pk), std::move(vk));
@@ -153,7 +156,7 @@ ram_ppzksnark_proof<ram_ppzksnark_ppT> ram_ppzksnark_prover(const ram_ppzksnark_
     universal_r1cs.print_execution_trace();
     universal_r1cs.print_memory_trace();
 #endif
-    const r1cs_ppzksnark_proof<snark_ppT> proof = r1cs_ppzksnark_prover<snark_ppT>(pk.r1cs_pk, r1cs_primary_input, r1cs_auxiliary_input);
+    const r1cs_ppzksnark_proof<snark_ppT> proof = r1cs_ppzksnark_prover<snark_ppT>(pk.r1cs_pk, pk.r1cs_cs, r1cs_primary_input, r1cs_auxiliary_input);
     libff::leave_block("Call to ram_ppzksnark_prover");
 
     return proof;

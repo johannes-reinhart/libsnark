@@ -59,17 +59,20 @@ class bacs_ppzksnark_proving_key {
 public:
     bacs_ppzksnark_circuit<ppT> circuit;
     r1cs_ppzksnark_proving_key<ppT> r1cs_pk;
+    r1cs_ppzksnark_constraint_system<ppT> r1cs_cs;
 
     bacs_ppzksnark_proving_key() {};
     bacs_ppzksnark_proving_key(const bacs_ppzksnark_proving_key<ppT> &other) = default;
     bacs_ppzksnark_proving_key(bacs_ppzksnark_proving_key<ppT> &&other) = default;
     bacs_ppzksnark_proving_key(const bacs_ppzksnark_circuit<ppT> &circuit,
-                               const r1cs_ppzksnark_proving_key<ppT> &r1cs_pk) :
-        circuit(circuit), r1cs_pk(r1cs_pk)
+                               const r1cs_ppzksnark_proving_key<ppT> &r1cs_pk,
+                               const r1cs_ppzksnark_constraint_system<ppT> &r1cs_cs) :
+        circuit(circuit), r1cs_pk(r1cs_pk), r1cs_cs(r1cs_cs)
     {}
     bacs_ppzksnark_proving_key(bacs_ppzksnark_circuit<ppT> &&circuit,
-                               r1cs_ppzksnark_proving_key<ppT> &&r1cs_pk) :
-        circuit(std::move(circuit)), r1cs_pk(std::move(r1cs_pk))
+                               r1cs_ppzksnark_proving_key<ppT> &&r1cs_pk,
+                               r1cs_ppzksnark_constraint_system<ppT> &&r1cs_cs) :
+        circuit(std::move(circuit)), r1cs_pk(std::move(r1cs_pk)), r1cs_cs(std::move(r1cs_cs))
     {}
 
     bacs_ppzksnark_proving_key<ppT>& operator=(const bacs_ppzksnark_proving_key<ppT> &other) = default;

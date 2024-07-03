@@ -145,8 +145,7 @@ bool r1cs_ppzkadsnark_proving_key<ppT>::operator==(const r1cs_ppzkadsnark_provin
             this->C_query == other.C_query &&
             this->H_query == other.H_query &&
             this->K_query == other.K_query &&
-            this->rA_i_Z_g1 == other.rA_i_Z_g1 &&
-            this->constraint_system == other.constraint_system);
+            this->rA_i_Z_g1 == other.rA_i_Z_g1);
 }
 
 template<typename ppT>
@@ -158,7 +157,6 @@ std::ostream& operator<<(std::ostream &out, const r1cs_ppzkadsnark_proving_key<p
     out << pk.H_query;
     out << pk.K_query;
     out << pk.rA_i_Z_g1;
-    out << pk.constraint_system;
 
     return out;
 }
@@ -172,7 +170,6 @@ std::istream& operator>>(std::istream &in, r1cs_ppzkadsnark_proving_key<ppT> &pk
     in >> pk.H_query;
     in >> pk.K_query;
     in >> pk.rA_i_Z_g1;
-    in >> pk.constraint_system;
 
     return in;
 }
@@ -412,6 +409,29 @@ std::vector<r1cs_ppzkadsnark_auth_data<ppT>> r1cs_ppzkadsnark_auth_sign(
 
 // symmetric
 template<typename ppT>
+std::vector<r1cs_ppzkadsnark_auth_data<ppT>> r1cs_ppzkadsnark_auth_sign_symmetric(
+        const std::vector<libff::Fr<snark_pp<ppT>>> &ins,
+        const r1cs_ppzkadsnark_sec_auth_key<ppT> &sk,
+        const std::vector<labelT> labels) {
+    libff::enter_block("Call to r1cs_ppzkadsnark_auth_sign_symmetric");
+    assert (labels.size()==ins.size());
+    std::vector<r1cs_ppzkadsnark_auth_data<ppT>> res;
+    res.reserve(ins.size());
+    for (size_t i = 0; i < ins.size();i++) {
+        libff::Fr<snark_pp<ppT>> lambda = prfCompute<ppT>(sk.S,labels[i]);
+        libff::G2<snark_pp<ppT>> Lambda = libff::G2<snark_pp<ppT>>::one(); // dummy Lambda
+        r1cs_ppzkadsnark_sigT<ppT> sig;
+        r1cs_ppzkadsnark_auth_data<ppT> val(std::move(lambda + sk.i * ins[i]),
+                                            std::move(Lambda),
+                                            std::move(sig));
+        res.emplace_back(val);
+    }
+    libff::leave_block("Call to r1cs_ppzkadsnark_auth_sign_symmetric");
+    return std::move(res);
+}
+
+// symmetric
+template<typename ppT>
 bool r1cs_ppzkadsnark_auth_verify(const std::vector<libff::Fr<snark_pp<ppT>>> &data,
                                   const std::vector<r1cs_ppzkadsnark_auth_data<ppT>> & auth_data,
                                   const r1cs_ppzkadsnark_sec_auth_key<ppT> &sak,
@@ -447,25 +467,30 @@ bool r1cs_ppzkadsnark_auth_verify(const std::vector<libff::Fr<snark_pp<ppT>>> &d
 }
 
 template <typename ppT>
-r1cs_ppzkadsnark_keypair<ppT> r1cs_ppzkadsnark_generator(const r1cs_ppzkadsnark_constraint_system<ppT> &cs,
+r1cs_ppzkadsnark_keypair<ppT> r1cs_ppzkadsnark_generator(r1cs_ppzkadsnark_constraint_system<ppT> &cs,
                                                          const r1cs_ppzkadsnark_pub_auth_prms<ppT> &prms)
 {
     libff::enter_block("Call to r1cs_ppzkadsnark_generator");
 
     /* make the B_query "lighter" if possible */
-    r1cs_ppzkadsnark_constraint_system<ppT> cs_copy(cs);
-    cs_copy.swap_AB_if_beneficial();
+    cs.swap_AB_if_beneficial();
 
     /* draw random element at which the QAP is evaluated */
     const  libff::Fr<snark_pp<ppT>> t = libff::Fr<snark_pp<ppT>>::random_element();
 
     qap_instance_evaluation<libff::Fr<snark_pp<ppT>> > qap_inst =
-        r1cs_to_qap_instance_map_with_evaluation(cs_copy, t);
+        r1cs_to_qap_instance_map_with_evaluation(cs, t);
 
-    libff::print_indent(); printf("* QAP number of variables: %zu\n", qap_inst.num_variables());
-    libff::print_indent(); printf("* QAP pre degree: %zu\n", cs_copy.constraints.size());
-    libff::print_indent(); printf("* QAP degree: %zu\n", qap_inst.degree());
-    libff::print_indent(); printf("* QAP number of input variables: %zu\n", qap_inst.num_inputs());
+    if(!libff::inhibit_profiling_info) {
+        libff::print_indent();
+        printf("* QAP number of variables: %zu\n", qap_inst.num_variables());
+        libff::print_indent();
+        printf("* QAP pre degree: %zu\n", cs.constraints.size());
+        libff::print_indent();
+        printf("* QAP degree: %zu\n", qap_inst.degree());
+        libff::print_indent();
+        printf("* QAP number of input variables: %zu\n", qap_inst.num_inputs());
+    }
 
     libff::enter_block("Compute query densities");
     size_t non_zero_At = 0, non_zero_Bt = 0, non_zero_Ct = 0, non_zero_Ht = 0;
@@ -634,8 +659,7 @@ r1cs_ppzkadsnark_keypair<ppT> r1cs_ppzkadsnark_generator(const r1cs_ppzkadsnark_
                                                                              std::move(C_query),
                                                                              std::move(H_query),
                                                                              std::move(K_query),
-                                                                             std::move(rA_i_Z_g1),
-                                                                             std::move(cs_copy));
+                                                                             std::move(rA_i_Z_g1));
 
     pk.print_size();
     vk.print_size();
@@ -645,6 +669,7 @@ r1cs_ppzkadsnark_keypair<ppT> r1cs_ppzkadsnark_generator(const r1cs_ppzkadsnark_
 
 template <typename ppT>
 r1cs_ppzkadsnark_proof<ppT> r1cs_ppzkadsnark_prover(const r1cs_ppzkadsnark_proving_key<ppT> &pk,
+                                                    const r1cs_ppzkadsnark_constraint_system<ppT> &constraint_system,
                                                     const r1cs_ppzkadsnark_primary_input<ppT> &primary_input,
                                                     const r1cs_ppzkadsnark_auxiliary_input<ppT> &auxiliary_input,
                                                     const std::vector<r1cs_ppzkadsnark_auth_data<ppT>> &auth_data)
@@ -652,7 +677,7 @@ r1cs_ppzkadsnark_proof<ppT> r1cs_ppzkadsnark_prover(const r1cs_ppzkadsnark_provi
     libff::enter_block("Call to r1cs_ppzkadsnark_prover");
 
 #ifdef DEBUG
-    assert(pk.constraint_system.is_satisfied(primary_input, auxiliary_input));
+    assert(constraint_system.is_satisfied(primary_input, auxiliary_input));
 #endif
 
     const libff::Fr<snark_pp<ppT>> d1 = libff::Fr<snark_pp<ppT>>::random_element(),
@@ -661,13 +686,13 @@ r1cs_ppzkadsnark_proof<ppT> r1cs_ppzkadsnark_prover(const r1cs_ppzkadsnark_provi
         dauth = libff::Fr<snark_pp<ppT>>::random_element();
 
     libff::enter_block("Compute the polynomial H");
-    const qap_witness<libff::Fr<snark_pp<ppT>> > qap_wit = r1cs_to_qap_witness_map(pk.constraint_system, primary_input,
+    const qap_witness<libff::Fr<snark_pp<ppT>> > qap_wit = r1cs_to_qap_witness_map(constraint_system, primary_input,
                                                                             auxiliary_input, d1 + dauth, d2, d3);
     libff::leave_block("Compute the polynomial H");
 
 #ifdef DEBUG
     const libff::Fr<snark_pp<ppT>> t = libff::Fr<snark_pp<ppT>>::random_element();
-    qap_instance_evaluation<libff::Fr<snark_pp<ppT>> > qap_inst = r1cs_to_qap_instance_map_with_evaluation(pk.constraint_system, t);
+    qap_instance_evaluation<libff::Fr<snark_pp<ppT>> > qap_inst = r1cs_to_qap_instance_map_with_evaluation(constraint_system, t);
     assert(qap_inst.is_satisfied(qap_wit));
 #endif
 
@@ -689,7 +714,7 @@ r1cs_ppzkadsnark_proof<ppT> r1cs_ppzkadsnark_prover(const r1cs_ppzkadsnark_provi
 #ifdef DEBUG
     for (size_t i = 0; i < qap_wit.num_inputs() + 1; ++i)
     {
-        assert(pk.A_query[i].g == libff::G1<snark_pp<ppT>>::zero());
+        //assert(pk.A_query[i].g == libff::G1<snark_pp<ppT>>::zero());
     }
     assert(pk.A_query.domain_size() == qap_wit.num_variables()+2);
     assert(pk.B_query.domain_size() == qap_wit.num_variables()+2);

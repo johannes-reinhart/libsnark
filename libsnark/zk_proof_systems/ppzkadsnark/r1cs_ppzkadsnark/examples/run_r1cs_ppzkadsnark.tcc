@@ -43,11 +43,12 @@ bool run_r1cs_ppzkadsnark(const r1cs_example<libff::Fr<snark_pp<ppT>> > &example
                           const bool test_serialization)
 {
     libff::enter_block("Call to run_r1cs_ppzkadsnark");
+    r1cs_constraint_system<libff::Fr<snark_pp<ppT>>> constraint_system = example.constraint_system;
 
     r1cs_ppzkadsnark_auth_keys<ppT> auth_keys = r1cs_ppzkadsnark_auth_generator<ppT>();
 
     libff::print_header("R1CS ppzkADSNARK Generator");
-    r1cs_ppzkadsnark_keypair<ppT> keypair = r1cs_ppzkadsnark_generator<ppT>(example.constraint_system,auth_keys.pap);
+    r1cs_ppzkadsnark_keypair<ppT> keypair = r1cs_ppzkadsnark_generator<ppT>(constraint_system,auth_keys.pap);
     printf("\n"); libff::print_indent(); libff::print_mem("after generator");
 
     libff::print_header("Preprocess verification key");
@@ -64,10 +65,10 @@ bool run_r1cs_ppzkadsnark(const r1cs_example<libff::Fr<snark_pp<ppT>> > &example
 
     libff::print_header("R1CS ppzkADSNARK Authenticate");
     std::vector<libff::Fr<snark_pp<ppT>>> data;
-    data.reserve(example.constraint_system.num_inputs());
+    data.reserve(constraint_system.num_inputs());
     std::vector<labelT> labels;
-    labels.reserve(example.constraint_system.num_inputs());
-    for (size_t i = 0; i < example.constraint_system.num_inputs(); i++) {
+    labels.reserve(constraint_system.num_inputs());
+    for (size_t i = 0; i < constraint_system.num_inputs(); i++) {
         labels.emplace_back(labelT());
         data.emplace_back(example.primary_input[i]);
     }
@@ -85,7 +86,7 @@ bool run_r1cs_ppzkadsnark(const r1cs_example<libff::Fr<snark_pp<ppT>> > &example
     assert (auth_res == auth_resp);
 
     libff::print_header("R1CS ppzkADSNARK Prover");
-    r1cs_ppzkadsnark_proof<ppT> proof = r1cs_ppzkadsnark_prover<ppT>(keypair.pk, example.primary_input, example.auxiliary_input,auth_data);
+    r1cs_ppzkadsnark_proof<ppT> proof = r1cs_ppzkadsnark_prover<ppT>(keypair.pk, constraint_system, example.primary_input, example.auxiliary_input,auth_data);
     printf("\n"); libff::print_indent(); libff::print_mem("after prover");
 
     if (test_serialization)

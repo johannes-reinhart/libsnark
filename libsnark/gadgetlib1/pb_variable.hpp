@@ -24,11 +24,15 @@ template<typename FieldT>
 class protoboard;
 
 template<typename FieldT>
+class structured_protoboard;
+
+template<typename FieldT>
 class pb_variable : public variable<FieldT> {
 public:
     pb_variable(const var_index_t index = 0) : variable<FieldT>(index) {};
 
     void allocate(protoboard<FieldT> &pb, const std::string &annotation="");
+    void allocate_from_block(structured_protoboard<FieldT> &pb, size_t block_id, const std::string &annotation);
 };
 
 template<typename FieldT>
@@ -58,6 +62,7 @@ public:
     pb_variable_array(typename contents::const_iterator first, typename contents::const_iterator last) : contents(first, last) {};
     pb_variable_array(typename contents::const_reverse_iterator first, typename contents::const_reverse_iterator last) : contents(first, last) {};
     void allocate(protoboard<FieldT> &pb, const size_t n, const std::string &annotation_prefix="");
+    void allocate_from_block(structured_protoboard<FieldT> &pb, const size_t block_id, const size_t n, const std::string &annotation_prefix);
 
     void fill_with_field_elements(protoboard<FieldT> &pb, const std::vector<FieldT>& vals) const;
     void fill_with_bits(protoboard<FieldT> &pb, const libff::bit_vector& bits) const;
@@ -81,6 +86,7 @@ public:
 
     pb_linear_combination();
     pb_linear_combination(const pb_variable<FieldT> &var);
+    pb_linear_combination(protoboard<FieldT> &pb, const linear_combination<FieldT> &lc);
 
     void assign(protoboard<FieldT> &pb, const linear_combination<FieldT> &lc);
     void evaluate(protoboard<FieldT> &pb) const;

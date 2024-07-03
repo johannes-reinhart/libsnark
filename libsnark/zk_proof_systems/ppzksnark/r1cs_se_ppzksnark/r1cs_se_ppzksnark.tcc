@@ -221,7 +221,7 @@ r1cs_se_ppzksnark_verification_key<ppT> r1cs_se_ppzksnark_verification_key<ppT>:
 }
 
 template <typename ppT>
-r1cs_se_ppzksnark_keypair<ppT> r1cs_se_ppzksnark_generator(const r1cs_se_ppzksnark_constraint_system<ppT> &cs)
+r1cs_se_ppzksnark_keypair<ppT> r1cs_se_ppzksnark_generator(r1cs_se_ppzksnark_constraint_system<ppT> &cs)
 {
     libff::enter_block("Call to r1cs_se_ppzksnark_generator");
 
@@ -440,7 +440,7 @@ r1cs_se_ppzksnark_proof<ppT> r1cs_se_ppzksnark_prover(const r1cs_se_ppzksnark_pr
     libff::enter_block("Call to r1cs_se_ppzksnark_prover");
 
 #ifdef DEBUG
-    assert(pk.constraint_system.is_satisfied(primary_input, auxiliary_input));
+    assert(constraint_system.is_satisfied(primary_input, auxiliary_input));
 #endif
 
     const libff::Fr<ppT> d1 = libff::Fr<ppT>::random_element(),
