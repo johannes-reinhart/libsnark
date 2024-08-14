@@ -1,10 +1,10 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.5)
 
 project (libsnark)
 
 set(
   CURVE
-  "BN128"
+  "BN254"
   CACHE
   STRING
   "Default curve: one of ALT_BN128, BN128, EDWARDS, MNT4, MNT6"
