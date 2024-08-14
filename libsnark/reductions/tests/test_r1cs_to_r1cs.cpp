@@ -25,11 +25,16 @@ using namespace libsnark;
 template<typename ppT>
 void print_r1cs(r1cs_constraint_system<libff::Fr<ppT>> constraint_system, r1cs_primary_input<libff::Fr<ppT>> primary_input,
                 r1cs_auxiliary_input<libff::Fr<ppT>> auxiliary_input){
+#ifdef DEBUG
     r1cs_variable_assignment<libff::Fr<ppT>> full_variable_assignment = primary_input;
     full_variable_assignment.insert(full_variable_assignment.end(), auxiliary_input.begin(), auxiliary_input.end());
     for(size_t i = 0; i < constraint_system.num_constraints(); ++i) {
         dump_r1cs_constraint(constraint_system.constraints[i], full_variable_assignment, constraint_system.variable_annotations);
     }
+#else
+    libff::UNUSED(constraint_system, primary_input, auxiliary_input);
+    std::cout << "Enable DEBUG flag to print constraint system" << std::endl;
+#endif
 }
 
 template<typename ppT>
