@@ -33,7 +33,7 @@ public:
     pb_variable_array<FieldT> instruction_results;
     pb_variable_array<FieldT> instruction_flags;
 
-    ALU_gadget<FieldT>(tinyram_protoboard<FieldT> &pb,
+    ALU_gadget(tinyram_protoboard<FieldT> &pb,
                        const pb_variable_array<FieldT> &opcode_indicators,
                        const word_variable_gadget<FieldT> &pc,
                        const word_variable_gadget<FieldT> &desval,

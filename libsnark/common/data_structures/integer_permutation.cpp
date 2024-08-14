@@ -15,6 +15,7 @@
 #include <cassert>
 #include <numeric>
 #include <unordered_set>
+#include <random>
 
 #include <libsnark/common/data_structures/integer_permutation.hpp>
 
@@ -115,7 +116,9 @@ bool integer_permutation::next_permutation()
 
 void integer_permutation::random_shuffle()
 {
-    return std::random_shuffle(contents.begin(), contents.end());
+    std::random_device rd;
+    std::mt19937 g(rd());
+    return std::shuffle(contents.begin(), contents.end(),g);
 }
 
 } // libsnark
