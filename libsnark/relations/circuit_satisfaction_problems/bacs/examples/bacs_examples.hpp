@@ -27,9 +27,9 @@ struct bacs_example {
     bacs_primary_input<FieldT> primary_input;
     bacs_auxiliary_input<FieldT> auxiliary_input;
 
-    bacs_example<FieldT>() = default;
-    bacs_example<FieldT>(const bacs_example<FieldT> &other) = default;
-    bacs_example<FieldT>(const bacs_circuit<FieldT> &circuit,
+    bacs_example() = default;
+    bacs_example(const bacs_example &other) = default;
+    bacs_example(const bacs_circuit<FieldT> &circuit,
                          const bacs_primary_input<FieldT> &primary_input,
                          const bacs_auxiliary_input<FieldT> &auxiliary_input) :
         circuit(circuit),
@@ -37,7 +37,7 @@ struct bacs_example {
         auxiliary_input(auxiliary_input)
     {}
 
-    bacs_example<FieldT>(bacs_circuit<FieldT> &&circuit,
+    bacs_example(bacs_circuit<FieldT> &&circuit,
                          bacs_primary_input<FieldT> &&primary_input,
                          bacs_auxiliary_input<FieldT> &&auxiliary_input) :
         circuit(std::move(circuit)),
