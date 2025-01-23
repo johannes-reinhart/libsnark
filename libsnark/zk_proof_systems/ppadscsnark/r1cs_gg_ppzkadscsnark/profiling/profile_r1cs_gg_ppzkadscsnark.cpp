@@ -92,8 +92,8 @@ adscsnark_profile_t profile_r1cs_gg_ppzkadscsnark(
     };
 
     r1cs_adsc_example<libff::Fr<PP> > example = generate_r1cs_adsc_example_with_field_input<libff::Fr<PP> >(num_constraints, public_io_size, private_input_size, state_size, samples);
-
-    r1cs_gg_ppzkadscsnark_constraint_system<PP> constraint_system = r1cs_to_r1cs_adsc(std::move(example.constraint_system), private_input_size, state_size);
+    r1cs_gg_ppzkadscsnark_constraint_system<PP> constraint_system(std::move(example.constraint_system), private_input_size, state_size);
+    constraint_system.swap_AB_if_beneficial();
     profile_result.witness_size = constraint_system.num_variables() - public_io_size - private_input_size - 2*state_size;
     profile_result.circuit_num_constraints = constraint_system.num_constraints();
 
@@ -107,39 +107,38 @@ adscsnark_profile_t profile_r1cs_gg_ppzkadscsnark(
     tend = libff::get_nsec_cpu_time();
     profile_result.verifier_preprocessing_runtime = tend - tstart;
 
-    r1cs_gg_ppzkadscsnark_proof<PP> previous_proof = keypair.initial_proof;
-    r1cs_gg_ppzkadscsnark_prover_state<PP> prover_state = keypair.initial_prover_state;
+    r1cs_gg_ppzkadscsnark_commitment<PP> previous_commitment = keypair.initial_commitment;
+    r1cs_gg_ppzkadscsnark_prover_state<PP> prover_state;
     for(size_t t = 0; t < samples; ++t) {
         tstart = libff::get_nsec_cpu_time();
-        r1cs_gg_ppzkadscsnark_authentication_tags<PP> tags = r1cs_gg_ppzkadscsnark_authenticate(keypair.aks[0], constraint_system.primary_input_size + 1, t, example.private_input[t]);
+        r1cs_gg_ppzkadscsnark_authenticated_input<PP> authenticated_input = r1cs_gg_ppzkadscsnark_authenticate(keypair.aks[0], t, example.private_input[t]);
         tend = libff::get_nsec_cpu_time();
         profile_measurements[t].authentication_runtime = tend - tstart;
 
-        r1cs_variable_assignment<libff::Fr<PP>> auxiliary_input(example.private_input[t]);
-        auxiliary_input.insert(auxiliary_input.end(), example.state_assignment[t].begin(), example.state_assignment[t].end());
-        auxiliary_input.insert(auxiliary_input.end(), example.state_assignment[t+1].begin(), example.state_assignment[t+1].end());
-        auxiliary_input.insert(auxiliary_input.end(), example.witness_assignment[t].begin(), example.witness_assignment[t].end());
-
         tstart = libff::get_nsec_cpu_time();
-        r1cs_gg_ppzkadscsnark_proof<PP> proof = r1cs_gg_ppzkadscsnark_prover<PP>(keypair.pk,
+        std::pair<r1cs_gg_ppzkadscsnark_proof<PP>, r1cs_gg_ppzkadscsnark_commitment<PP>> proof
+                                            = r1cs_gg_ppzkadscsnark_prover<PP>(keypair.pk,
                                                                                constraint_system,
                                                                                example.primary_input[t],
-                                                                               auxiliary_input,
-                                                                               tags,
+                                                                               {authenticated_input},
+                                                                               example.state_assignment[t],
+                                                                               example.state_assignment[t+1],
+                                                                               example.witness_assignment[t],
                                                                                prover_state);
         tend = libff::get_nsec_cpu_time();
         profile_measurements[t].prover_runtime = tend - tstart;
 
         if(t == 0){
-            profile_result.proof_size = get_serialized_size(proof);
+            profile_result.proof_size = get_serialized_size(proof.first) + get_serialized_size(proof.second);
         }
 
         tstart = libff::get_nsec_cpu_time();
-        bool verified = r1cs_gg_ppzkadscsnark_online_verifier_strong_IC<PP>(pvk, example.primary_input[t], proof, previous_proof, t);
+        bool verified = r1cs_gg_ppzkadscsnark_online_verifier_strong_IC<PP>(pvk, example.primary_input[t], proof.first,
+            proof.second, previous_commitment, t);
         tend = libff::get_nsec_cpu_time();
         profile_measurements[t].verifier_runtime = tend - tstart;
 
-        previous_proof = proof;
+        previous_commitment = proof.second;
         if(!verified){
             throw std::runtime_error("Proof does not verify");
         }
@@ -191,9 +190,11 @@ int main(int argc, const char * argv[])
 
     PP::init_public_params();
 
+#ifndef DEBUG
     // We do not want to print profiling info at runtime, we will print results at the end
     libff::inhibit_profiling_info = true;
     libff::inhibit_profiling_counters = true;
+#endif
 
     std::cout << "Running " APPLICATION_NAME << std::endl;
 

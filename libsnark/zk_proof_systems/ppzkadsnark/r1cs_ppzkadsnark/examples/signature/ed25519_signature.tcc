@@ -21,6 +21,14 @@
 
 namespace libsnark {
 
+inline std::ostream& operator<<(std::ostream &out, const ed25519_sigT &sig)
+{
+    std::vector<uint8_t> bytes_vector(std::begin(sig.sig_bytes), std::end(sig.sig_bytes));
+    libff::output_bytes(out, bytes_vector);
+    return out;
+}
+
+
 template<>
 kpT<default_r1cs_ppzkadsnark_pp> sigGen<default_r1cs_ppzkadsnark_pp>(void) {
     kpT<default_r1cs_ppzkadsnark_pp> keys;

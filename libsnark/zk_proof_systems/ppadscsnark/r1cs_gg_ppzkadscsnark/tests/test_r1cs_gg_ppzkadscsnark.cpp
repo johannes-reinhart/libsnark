@@ -9,7 +9,6 @@
 #include <libff/common/profiling.hpp>
 
 #include <libsnark/common/default_types/r1cs_gg_ppzkadscsnark_pp.hpp>
-#include <libsnark/relations/constraint_satisfaction_problems/r1cs/examples/r1cs_examples.hpp>
 #include <libsnark/zk_proof_systems/ppadscsnark/r1cs_gg_ppzkadscsnark/examples/run_r1cs_gg_ppzkadscsnark.hpp>
 
 using namespace libsnark;

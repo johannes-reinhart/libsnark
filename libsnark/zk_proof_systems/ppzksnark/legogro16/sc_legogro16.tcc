@@ -41,39 +41,12 @@ std::istream& operator>>(std::istream &in, sc_lego_gro16_proving_key<ppT> &pk)
 }
 
 
-template<typename ppT>
-bool sc_lego_gro16_proof<ppT>::operator==(const sc_lego_gro16_proof<ppT> &other) const
-{
-    return (this->proof == other.proof &&
-            this->commitment == other.commitment);
-}
-
-template<typename ppT>
-std::ostream& operator<<(std::ostream &out, const sc_lego_gro16_proof<ppT> &proof)
-{
-    out << proof.proof << OUTPUT_NEWLINE;
-    out << proof.commitment << OUTPUT_NEWLINE;
-    return out;
-}
-
-template<typename ppT>
-std::istream& operator>>(std::istream &in, sc_lego_gro16_proof<ppT> &proof)
-{
-    in >> proof.proof;
-    libff::consume_OUTPUT_NEWLINE(in);
-    in >> proof.commitment;
-    libff::consume_OUTPUT_NEWLINE(in);
-    return in;
-}
-
-
-
 template <typename ppT>
 sc_lego_gro16_keypair<ppT> sc_lego_gro16_generator(const lego_gro16_constraint_system<ppT> &cs, const lego_gro16_assignment<ppT> &initial_state)
 {
     libff::enter_block("Call to sc_lego_gro16_generator");
 
-    sc_lego_gro16_proof<ppT> initial_proof;
+    sc_lego_gro16_commitment<ppT> initial_commitment;
     sc_lego_gro16_prover_state<ppT> initial_prover_state;
 
     pedersen_commitment_key<ppT> ck = pedersen_commitment_generator<ppT>(cs.commitment_size);
@@ -84,26 +57,26 @@ sc_lego_gro16_keypair<ppT> sc_lego_gro16_generator(const lego_gro16_constraint_s
     sc_lego_gro16_proving_key<ppT> pk(std::move(keypair.pk), std::move(ck));
 
     initial_prover_state.cp = cp0;
-    initial_proof.commitment = cp0.commitment;
+    initial_commitment = cp0.commitment;
 
-    return sc_lego_gro16_keypair<ppT>(std::move(pk), std::move(keypair.vk), std::move(initial_proof), std::move(initial_prover_state));
+    return sc_lego_gro16_keypair<ppT>(std::move(pk), std::move(keypair.vk), std::move(initial_commitment), std::move(initial_prover_state));
 }
 
 template <typename ppT>
-sc_lego_gro16_proof<ppT> sc_lego_gro16_prover(const sc_lego_gro16_proving_key<ppT> &pk,
+std::pair<sc_lego_gro16_proof<ppT>, sc_lego_gro16_commitment<ppT>> sc_lego_gro16_prover(const sc_lego_gro16_proving_key<ppT> &pk,
                                               const lego_gro16_constraint_system<ppT> &constraint_system,
                                               const lego_gro16_primary_input<ppT> &primary_input,
-                                              const lego_gro16_assignment<ppT> &state_assignment_old,
-                                              const lego_gro16_assignment<ppT> &state_assignment_new,
-                                              const lego_gro16_assignment<ppT> &witness_assignment,
+                                              const lego_gro16_assignment<ppT> &state_input,
+                                              const lego_gro16_assignment<ppT> &state_update_input,
+                                              const lego_gro16_assignment<ppT> &witness_input,
                                               sc_lego_gro16_prover_state<ppT> &prover_state)
 {
-    r1cs_variable_assignment<libff::Fr<ppT>> auxiliary_input(state_assignment_old);
-    auxiliary_input.insert(auxiliary_input.end(), state_assignment_new.begin(), state_assignment_new.end());
-    auxiliary_input.insert(auxiliary_input.end(), witness_assignment.begin(), witness_assignment.end());
+    r1cs_variable_assignment<libff::Fr<ppT>> auxiliary_input(state_input);
+    auxiliary_input.insert(auxiliary_input.end(), state_update_input.begin(), state_update_input.end());
+    auxiliary_input.insert(auxiliary_input.end(), witness_input.begin(), witness_input.end());
 
     libff::enter_block("Call to sc_lego_gro16_prover");
-    pedersen_commitment_pair<ppT> cp = pedersen_commitment_commit<ppT>(pk.commitment_key, state_assignment_new);
+    pedersen_commitment_pair<ppT> cp = pedersen_commitment_commit<ppT>(pk.commitment_key, state_update_input);
 
     lego_gro16_proof<ppT> legogro_proof = lego_gro16_prover<ppT>(pk.pk_lego_gro16,
                                                        constraint_system,
@@ -114,10 +87,9 @@ sc_lego_gro16_proof<ppT> sc_lego_gro16_prover(const sc_lego_gro16_proving_key<pp
 
     libff::leave_block("Call to sc_lego_gro16_prover");
 
-    sc_lego_gro16_proof<ppT> proof = sc_lego_gro16_proof<ppT>(std::move(legogro_proof), std::move(cp.commitment));
     prover_state.cp = cp;
 
-    return proof;
+    return std::pair<sc_lego_gro16_proof<ppT>, sc_lego_gro16_commitment<ppT>>(legogro_proof, cp.commitment);
 }
 
 template<typename ppT>
@@ -130,11 +102,12 @@ template <typename ppT>
 bool sc_lego_gro16_online_verifier_weak_IC(const sc_lego_gro16_processed_verification_key<ppT> &vk,
                                             const lego_gro16_primary_input<ppT> &primary_input,
                                             const sc_lego_gro16_proof<ppT> &proof,
-                                            const sc_lego_gro16_proof<ppT> &proof_previous)
+                                            const sc_lego_gro16_commitment<ppT> &commitment,
+                                            const sc_lego_gro16_commitment<ppT> &commitment_previous)
 {
     bool result;
     libff::enter_block("Call to sc_lego_gro16_online_verifier_weak_IC");
-    result = lego_gro16_online_verifier_weak_IC(vk, primary_input, {proof_previous.commitment, proof.commitment}, proof.proof);
+    result = lego_gro16_online_verifier_weak_IC(vk, primary_input, {commitment_previous, commitment}, proof);
     libff::leave_block("Call to sc_lego_gro16_online_verifier_weak_IC");
 
     return result;
@@ -144,11 +117,12 @@ template<typename ppT>
 bool sc_lego_gro16_verifier_weak_IC(const sc_lego_gro16_verification_key<ppT> &vk,
                                     const lego_gro16_primary_input<ppT> &primary_input,
                                     const sc_lego_gro16_proof<ppT> &proof,
-                                    const sc_lego_gro16_proof<ppT> &proof_previous)
+                                    const sc_lego_gro16_commitment<ppT> &commitment,
+                                    const sc_lego_gro16_commitment<ppT> &commitment_previous)
 {
     libff::enter_block("Call to sc_lego_gro16_verifier_weak_IC");
     sc_lego_gro16_processed_verification_key<ppT> pvk = sc_lego_gro16_verifier_process_vk<ppT>(vk);
-    bool result = sc_lego_gro16_online_verifier_weak_IC<ppT>(pvk, primary_input, proof, proof_previous);
+    bool result = sc_lego_gro16_online_verifier_weak_IC<ppT>(pvk, primary_input, proof, commitment, commitment_previous);
     libff::leave_block("Call to sc_lego_gro16_verifier_weak_IC");
     return result;
 }
@@ -157,11 +131,12 @@ template<typename ppT>
 bool sc_lego_gro16_online_verifier_strong_IC(const sc_lego_gro16_processed_verification_key<ppT> &vk,
                                              const lego_gro16_primary_input<ppT> &primary_input,
                                              const sc_lego_gro16_proof<ppT> &proof,
-                                             const sc_lego_gro16_proof<ppT> &proof_previous)
+                                             const sc_lego_gro16_commitment<ppT> &commitment,
+                                             const sc_lego_gro16_commitment<ppT> &commitment_previous)
 {
     bool result;
     libff::enter_block("Call to sc_lego_gro16_online_verifier_strong_IC");
-    result = lego_gro16_online_verifier_strong_IC(vk, primary_input, {proof_previous.commitment, proof.commitment}, proof.proof);
+    result = lego_gro16_online_verifier_strong_IC(vk, primary_input, {commitment_previous, commitment}, proof);
     libff::leave_block("Call to sc_lego_gro16_online_verifier_strong_IC");
     return result;
 }
@@ -170,11 +145,12 @@ template<typename ppT>
 bool sc_lego_gro16_verifier_strong_IC(const sc_lego_gro16_verification_key<ppT> &vk,
                                       const lego_gro16_primary_input<ppT> &primary_input,
                                       const sc_lego_gro16_proof<ppT> &proof,
-                                      const sc_lego_gro16_proof<ppT> &proof_previous)
+                                      const sc_lego_gro16_commitment<ppT> &commitment,
+                                      const sc_lego_gro16_commitment<ppT> &commitment_previous)
 {
     libff::enter_block("Call to sc_lego_gro16_verifier_strong_IC");
     sc_lego_gro16_processed_verification_key<ppT> pvk = sc_lego_gro16_verifier_process_vk<ppT>(vk);
-    bool result = sc_lego_gro16_online_verifier_strong_IC<ppT>(pvk, primary_input, proof, proof_previous);
+    bool result = sc_lego_gro16_online_verifier_strong_IC<ppT>(pvk, primary_input, proof, commitment, commitment_previous);
     libff::leave_block("Call to sc_lego_gro16_verifier_strong_IC");
     return result;
 }

@@ -7,7 +7,7 @@
 namespace libsnark {
 
 template<typename FieldT>
-structured_protoboard<FieldT>::structured_protoboard() : protoboard<FieldT>()
+structured_protoboard<FieldT>::structured_protoboard() : protoboard<FieldT>(), last_block_id(0)
 {}
 
 template<typename FieldT>
@@ -29,10 +29,19 @@ size_t structured_protoboard<FieldT>::get_block_allocated_variables(size_t block
 }
 
 template<typename FieldT>
+r1cs_variable_assignment<FieldT> structured_protoboard<FieldT>::get_free_assignment() const
+{
+    block_info_t last_block = blocks.at(last_block_id);
+    return r1cs_variable_assignment<FieldT>(this->values.begin() + last_block.start + last_block.size - 1,
+        this->values.end());
+}
+
+
+template<typename FieldT>
 r1cs_variable_assignment<FieldT> structured_protoboard<FieldT>::get_block_assignment(size_t blockid) const
 {
     block_info_t block = blocks.at(blockid);
-    return r1cs_variable_assignment<FieldT>(this->values.begin() + block.start, this->values.begin() + block.start + block.size);
+    return r1cs_variable_assignment<FieldT>(this->values.begin() + block.start - 1, this->values.begin() + block.start + block.size - 1);
 }
 
 template<typename FieldT>
@@ -61,6 +70,7 @@ void structured_protoboard<FieldT>::reserve_block(size_t blockid, size_t size)
     }
 
     blocks[blockid] = block;
+    last_block_id = blockid;
 
 }
 

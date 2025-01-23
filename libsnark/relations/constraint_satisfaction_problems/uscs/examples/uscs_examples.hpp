@@ -25,16 +25,16 @@ struct uscs_example {
     uscs_primary_input<FieldT> primary_input;
     uscs_auxiliary_input<FieldT> auxiliary_input;
 
-    uscs_example<FieldT>() = default;
-    uscs_example<FieldT>(const uscs_example<FieldT> &other) = default;
-    uscs_example<FieldT>(const uscs_constraint_system<FieldT> &constraint_system,
+    uscs_example() = default;
+    uscs_example(const uscs_example &other) = default;
+    uscs_example(const uscs_constraint_system<FieldT> &constraint_system,
                          const uscs_primary_input<FieldT> &primary_input,
                          const uscs_auxiliary_input<FieldT> &auxiliary_input) :
         constraint_system(constraint_system),
         primary_input(primary_input),
         auxiliary_input(auxiliary_input)
     {};
-    uscs_example<FieldT>(uscs_constraint_system<FieldT> &&constraint_system,
+    uscs_example(uscs_constraint_system<FieldT> &&constraint_system,
                          uscs_primary_input<FieldT> &&primary_input,
                          uscs_auxiliary_input<FieldT> &&auxiliary_input) :
         constraint_system(std::move(constraint_system)),

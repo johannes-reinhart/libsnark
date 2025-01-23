@@ -11,7 +11,7 @@
 #include <libff/algebra/curves/public_params.hpp>
 
 #include <libsnark/relations/constraint_satisfaction_problems/r1cs/r1cs_ext.hpp>
-#include <libsnark/libsnark/zk_proof_systems/ppzksnark/legogro16/cc_gro16_params.hpp>
+#include <libsnark/zk_proof_systems/ppzksnark/legogro16/cc_gro16_params.hpp>
 
 namespace libsnark {
 

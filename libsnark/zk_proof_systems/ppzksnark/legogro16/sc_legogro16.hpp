@@ -92,77 +92,23 @@ template<typename ppT>
 using sc_lego_gro16_processed_verification_key = lego_gro16_processed_verification_key<ppT>;
 
 template<typename ppT>
-struct  sc_lego_gro16_prover_state {
+class  sc_lego_gro16_prover_state {
+public:
     pedersen_commitment_pair<ppT> cp;
+
+    sc_lego_gro16_prover_state() :
+        cp()
+    {}
 };
 
 /*********************************** Proof ***********************************/
+template<typename ppT>
+using sc_lego_gro16_proof = lego_gro16_proof<ppT>;
+
+/*********************************** Commitment ***********************************/
 
 template<typename ppT>
-class sc_lego_gro16_proof;
-
-template<typename ppT>
-std::ostream& operator<<(std::ostream &out, const sc_lego_gro16_proof<ppT> &proof);
-
-template<typename ppT>
-std::istream& operator>>(std::istream &in, sc_lego_gro16_proof<ppT> &proof);
-
-/**
- * A proof for SC-LegoGro16.
- *
- * While the proof has a structure, externally one merely opaquely produces,
- * serializes/deserializes, and verifies proofs. We only expose some information
- * about the structure for statistics purposes.
- */
-template<typename ppT>
-class sc_lego_gro16_proof {
-public:
-    lego_gro16_proof<ppT> proof;
-    pedersen_commitment_commitment<ppT> commitment;
-
-    sc_lego_gro16_proof() = default;
-
-    sc_lego_gro16_proof(lego_gro16_proof<ppT> &&proof,
-                        pedersen_commitment_commitment<ppT> &&commitment) :
-            proof(std::move(proof)),
-            commitment(std::move(commitment))
-    {};
-
-    size_t G1_size() const
-    {
-        return proof.G1_size() + 1;
-    }
-
-    size_t G2_size() const
-    {
-        return proof.G2_size();
-    }
-
-    size_t size_in_bits() const
-    {
-        return G1_size() * libff::G1<ppT>::size_in_bits() + G2_size() * libff::G2<ppT>::size_in_bits();
-    }
-
-    void print_size() const
-    {
-        if(libff::inhibit_profiling_info) {
-            return;
-        }
-        libff::print_indent(); printf("* G1 elements in proof: %zu\n", this->G1_size());
-        libff::print_indent(); printf("* G2 elements in proof: %zu\n", this->G2_size());
-        libff::print_indent(); printf("* Proof size in bits: %zu\n", this->size_in_bits());
-    }
-
-    bool is_well_formed() const
-    {
-        return (proof.is_well_formed() &&
-                commitment.is_well_formed());
-    }
-
-    bool operator==(const sc_lego_gro16_proof<ppT> &other) const;
-    friend std::ostream& operator<< <ppT>(std::ostream &out, const sc_lego_gro16_proof<ppT> &proof);
-    friend std::istream& operator>> <ppT>(std::istream &in, sc_lego_gro16_proof<ppT> &proof);
-};
+using sc_lego_gro16_commitment = pedersen_commitment_commitment<ppT>;
 
 /********************************** Key pair *********************************/
 
@@ -174,18 +120,18 @@ class sc_lego_gro16_keypair {
 public:
     sc_lego_gro16_proving_key<ppT> pk;
     sc_lego_gro16_verification_key<ppT> vk;
-    sc_lego_gro16_proof<ppT> initial_proof;
+    sc_lego_gro16_commitment<ppT> initial_commitment;
     sc_lego_gro16_prover_state<ppT> initial_prover_state;
 
     sc_lego_gro16_keypair() = default;
     sc_lego_gro16_keypair(const sc_lego_gro16_keypair<ppT> &other) = default;
     sc_lego_gro16_keypair(sc_lego_gro16_proving_key<ppT> &&pk,
                           sc_lego_gro16_verification_key<ppT> &&vk,
-                          sc_lego_gro16_proof<ppT> &&initial_proof,
+                          sc_lego_gro16_commitment<ppT> &&initial_commitment,
                           sc_lego_gro16_prover_state<ppT> &&initial_prover_state) :
             pk(std::move(pk)),
             vk(std::move(vk)),
-            initial_proof(std::move(initial_proof)),
+            initial_commitment(std::move(initial_commitment)),
             initial_prover_state(std::move(initial_prover_state))
     {}
 
@@ -208,12 +154,13 @@ sc_lego_gro16_keypair<ppT> sc_lego_gro16_generator(const lego_gro16_constraint_s
  * auxiliary input contains also assignments for commitments
  */
 template<typename ppT>
-sc_lego_gro16_proof<ppT> sc_lego_gro16_prover(const sc_lego_gro16_proving_key<ppT> &pk,
+std::pair<sc_lego_gro16_proof<ppT>, sc_lego_gro16_commitment<ppT>> sc_lego_gro16_prover(
+                                              const sc_lego_gro16_proving_key<ppT> &pk,
                                               const lego_gro16_constraint_system<ppT> &constraint_system,
                                               const lego_gro16_primary_input<ppT> &primary_input,
-                                              const lego_gro16_assignment<ppT> &state_assignment_old,
-                                              const lego_gro16_assignment<ppT> &state_assignment_new,
-                                              const lego_gro16_assignment<ppT> &witness_assignment,
+                                              const lego_gro16_assignment<ppT> &state_input,
+                                              const lego_gro16_assignment<ppT> &state_update_input,
+                                              const lego_gro16_assignment<ppT> &witness_input,
                                               sc_lego_gro16_prover_state<ppT> &prover_state);
 
 /*
@@ -239,7 +186,8 @@ template<typename ppT>
 bool sc_lego_gro16_verifier_weak_IC(const sc_lego_gro16_verification_key<ppT> &vk,
                                     const lego_gro16_primary_input<ppT> &primary_input,
                                     const sc_lego_gro16_proof<ppT> &proof,
-                                    const sc_lego_gro16_proof<ppT> &proof_previous);
+                                    const sc_lego_gro16_commitment<ppT> &commitment,
+                                    const sc_lego_gro16_commitment<ppT> &commitment_previous);
 
 /**
  * A verifier algorithm for LegoGro16 that:
@@ -248,9 +196,10 @@ bool sc_lego_gro16_verifier_weak_IC(const sc_lego_gro16_verification_key<ppT> &v
  */
 template<typename ppT>
 bool sc_lego_gro16_verifier_strong_IC(const sc_lego_gro16_verification_key<ppT> &vk,
-                                   const lego_gro16_primary_input<ppT> &primary_input,
-                                   const sc_lego_gro16_proof<ppT> &proof,
-                                   const sc_lego_gro16_proof<ppT> &proof_previous);
+                                    const lego_gro16_primary_input<ppT> &primary_input,
+                                    const sc_lego_gro16_proof<ppT> &proof,
+                                    const sc_lego_gro16_commitment<ppT> &commitment,
+                                    const sc_lego_gro16_commitment<ppT> &commitment_previous);
 
 /**
  * Convert a (non-processed) verification key into a processed verification key.
@@ -265,9 +214,10 @@ sc_lego_gro16_processed_verification_key<ppT> sc_lego_gro16_verifier_process_vk(
  */
 template<typename ppT>
 bool sc_lego_gro16_online_verifier_weak_IC(const sc_lego_gro16_processed_verification_key<ppT> &vk,
-                                        const lego_gro16_primary_input<ppT> &primary_input,
-                                        const sc_lego_gro16_proof<ppT> &proof,
-                                        const sc_lego_gro16_proof<ppT> &proof_previous);
+                                            const lego_gro16_primary_input<ppT> &primary_input,
+                                            const sc_lego_gro16_proof<ppT> &proof,
+                                            const sc_lego_gro16_commitment<ppT> &commitment,
+                                            const sc_lego_gro16_commitment<ppT> &commitment_previous);
 
 /**
  * A verifier algorithm for LegoGro16 that:
@@ -276,9 +226,10 @@ bool sc_lego_gro16_online_verifier_weak_IC(const sc_lego_gro16_processed_verific
  */
 template<typename ppT>
 bool sc_lego_gro16_online_verifier_strong_IC(const sc_lego_gro16_processed_verification_key<ppT> &vk,
-                                          const lego_gro16_primary_input<ppT> &primary_input,
-                                          const sc_lego_gro16_proof<ppT> &proof,
-                                          const sc_lego_gro16_proof<ppT> &proof_previous);
+                                            const lego_gro16_primary_input<ppT> &primary_input,
+                                            const sc_lego_gro16_proof<ppT> &proof,
+                                            const sc_lego_gro16_commitment<ppT> &commitment,
+                                            const sc_lego_gro16_commitment<ppT> &commitment_previous);
 
 } // libsnark
 

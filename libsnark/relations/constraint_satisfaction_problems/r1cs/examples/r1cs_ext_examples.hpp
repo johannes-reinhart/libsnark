@@ -27,9 +27,9 @@ struct r1cs_sc_example {
     std::vector<r1cs_variable_assignment<FieldT>> witness_assignment;
     std::vector<r1cs_variable_assignment<FieldT>> state_assignment;
 
-    r1cs_sc_example<FieldT>() = default;
-    r1cs_sc_example<FieldT>(const r1cs_sc_example<FieldT> &other) = default;
-    r1cs_sc_example<FieldT>(const r1cs_constraint_system<FieldT> &constraint_system,
+    r1cs_sc_example() = default;
+    r1cs_sc_example(const r1cs_sc_example &other) = default;
+    r1cs_sc_example(const r1cs_constraint_system<FieldT> &constraint_system,
                          const std::vector<r1cs_primary_input<FieldT>> &primary_input,
                          const std::vector<r1cs_variable_assignment<FieldT>> &witness_assignment,
                            const std::vector<r1cs_variable_assignment<FieldT>> &state_assignment) :
@@ -38,7 +38,7 @@ struct r1cs_sc_example {
         witness_assignment(witness_assignment),
         state_assignment(state_assignment)
     {};
-    r1cs_sc_example<FieldT>(r1cs_constraint_system<FieldT> &&constraint_system,
+    r1cs_sc_example(r1cs_constraint_system<FieldT> &&constraint_system,
                          std::vector<r1cs_primary_input<FieldT>> &&primary_input,
                          std::vector<r1cs_variable_assignment<FieldT>> &&witness_assignment,
                          std::vector<r1cs_variable_assignment<FieldT>> &&state_assignment) :
@@ -57,9 +57,9 @@ struct r1cs_adsc_example {
     std::vector<r1cs_variable_assignment<FieldT>> witness_assignment;
     std::vector<r1cs_variable_assignment<FieldT>> state_assignment;
 
-    r1cs_adsc_example<FieldT>() = default;
-    r1cs_adsc_example<FieldT>(const r1cs_adsc_example<FieldT> &other) = default;
-    r1cs_adsc_example<FieldT>(const r1cs_constraint_system<FieldT> &constraint_system,
+    r1cs_adsc_example() = default;
+    r1cs_adsc_example(const r1cs_adsc_example &other) = default;
+    r1cs_adsc_example(const r1cs_constraint_system<FieldT> &constraint_system,
                             const std::vector<r1cs_primary_input<FieldT>> &primary_input,
                             const std::vector<r1cs_variable_assignment<FieldT>> &private_input,
                             const std::vector<r1cs_variable_assignment<FieldT>> &witness_assignment,
@@ -70,7 +70,7 @@ struct r1cs_adsc_example {
             witness_assignment(witness_assignment),
             state_assignment(state_assignment)
     {};
-    r1cs_adsc_example<FieldT>(r1cs_constraint_system<FieldT> &&constraint_system,
+    r1cs_adsc_example(r1cs_constraint_system<FieldT> &&constraint_system,
                             std::vector<r1cs_primary_input<FieldT>> &&primary_input,
                             std::vector<r1cs_variable_assignment<FieldT>> &&private_input,
                             std::vector<r1cs_variable_assignment<FieldT>> &&witness_assignment,

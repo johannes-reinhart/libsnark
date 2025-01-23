@@ -12,7 +12,6 @@
 
 #include <libff/algebra/curves/public_params.hpp>
 
-#include <libsnark/relations/constraint_satisfaction_problems/r1cs/r1cs_ext.hpp>
 #include <libsnark/relations/constraint_satisfaction_problems/r1cs/examples/r1cs_ext_examples.hpp>
 
 namespace libsnark {
@@ -29,7 +28,7 @@ bool run_r1cs_gg_ppzkadscsnark(r1cs_adsc_example<libff::Fr<ppT>> &example,
                              size_t private_input_size,
                              size_t state_size,
                             size_t iterations,
-                            const bool test_serialization);
+                            bool test_serialization);
 
 } // libsnark
 

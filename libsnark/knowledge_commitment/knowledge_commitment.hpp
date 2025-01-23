@@ -37,10 +37,10 @@ struct knowledge_commitment {
     T1 g;
     T2 h;
 
-    knowledge_commitment<T1,T2>() = default;
-    knowledge_commitment<T1,T2>(const knowledge_commitment<T1,T2> &other) = default;
-    knowledge_commitment<T1,T2>(knowledge_commitment<T1,T2> &&other) = default;
-    knowledge_commitment<T1,T2>(const T1 &g, const T2 &h);
+    knowledge_commitment() = default;
+    knowledge_commitment(const knowledge_commitment<T1,T2> &other) = default;
+    knowledge_commitment(knowledge_commitment<T1,T2> &&other) = default;
+    knowledge_commitment(const T1 &g, const T2 &h);
 
     knowledge_commitment<T1,T2>& operator=(const knowledge_commitment<T1,T2> &other) = default;
     knowledge_commitment<T1,T2>& operator=(knowledge_commitment<T1,T2> &&other) = default;

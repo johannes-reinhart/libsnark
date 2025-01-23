@@ -109,36 +109,37 @@ adscsnark_profile_t profile_legogro16(
     tend = libff::get_nsec_cpu_time();
     profile_result.verifier_preprocessing_runtime = tend - tstart;
 
-    sc_lego_gro16_proof<PP> previous_proof = keypair.initial_proof;
+    sc_lego_gro16_commitment<PP> previous_commitment = keypair.initial_commitment;
     sc_lego_gro16_prover_state<PP> prover_state = keypair.initial_prover_state;
     for(size_t t = 0; t < samples; ++t) {
         profile_measurements[t].authentication_runtime = 0;
 
 
         tstart = libff::get_nsec_cpu_time();
-        sc_lego_gro16_proof<PP> proof = sc_lego_gro16_prover(keypair.pk,
-                                                             constraint_system,
-                                                             example.primary_input[t],
-                                                             example.state_assignment[t],
-                                                             example.state_assignment[t+1],
-                                                             example.witness_assignment[t],
-                                                             prover_state);
+        std::pair<sc_lego_gro16_proof<PP>, sc_lego_gro16_commitment<PP>> proof =
+                                                           sc_lego_gro16_prover<PP>(keypair.pk,
+                                                                                constraint_system,
+                                                                                example.primary_input[t],
+                                                                                example.state_assignment[t],
+                                                                                example.state_assignment[t+1],
+                                                                                example.witness_assignment[t],
+                                                                                prover_state);
 
 
         tend = libff::get_nsec_cpu_time();
         profile_measurements[t].prover_runtime = tend - tstart;
 
         if(t == 0){
-            profile_result.proof_size = libff::get_serialized_size(proof);
+            profile_result.proof_size = get_serialized_size(proof.first) + get_serialized_size(proof.second);
         }
 
         tstart = libff::get_nsec_cpu_time();
-        bool verified = sc_lego_gro16_online_verifier_strong_IC<PP>(pvk, example.primary_input[t], proof, previous_proof);
+        bool verified = sc_lego_gro16_online_verifier_strong_IC<PP>(pvk, example.primary_input[t], proof.first, proof.second, previous_commitment);
 
         tend = libff::get_nsec_cpu_time();
         profile_measurements[t].verifier_runtime = tend - tstart;
 
-        previous_proof = proof;
+        previous_commitment = proof.second;
         if(!verified){
             throw std::runtime_error("Proof does not verify");
         }
@@ -190,9 +191,11 @@ int main(int argc, const char * argv[])
 
     PP::init_public_params();
 
+#ifndef DEBUG
     // We do not want to print profiling info at runtime, we will print results at the end
     libff::inhibit_profiling_info = true;
     libff::inhibit_profiling_counters = true;
+#endif
 
     std::cout << "Running " APPLICATION_NAME << std::endl;
 

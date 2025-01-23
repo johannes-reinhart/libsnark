@@ -15,6 +15,6 @@ FieldT prp(const FieldT key, const FieldT label);
 
 }
 
-#include <libsnark/common/prf/prf.tcc>
+#include <libsnark/common/crypto/prf/prf.tcc>
 
 #endif //PRF_HPP

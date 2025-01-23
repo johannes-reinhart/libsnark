@@ -28,8 +28,10 @@ template<typename ppT>
 using r1cs_gg_ppzkadscsnark_auxiliary_input = r1cs_auxiliary_input<libff::Fr<ppT> >;
 
 template<typename ppT>
-using r1cs_gg_ppzkadscsnark_variable_assignment = r1cs_variable_assignment<libff::Fr<ppT> >;
+using r1cs_gg_ppzkadscsnark_assignment = r1cs_variable_assignment<libff::Fr<ppT> >;
 
+template<typename ppT>
+using r1cs_gg_ppzkadscsnark_label = libff::Fr<ppT>;
 
 } // libsnark
 

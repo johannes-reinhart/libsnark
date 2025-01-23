@@ -73,6 +73,18 @@ else()
   )
 endif()
 
+add_library(
+        snark_crypto
+
+        STATIC
+        common/crypto/digest/sha.cpp
+        common/crypto/signature/eddsa.cpp
+)
+target_link_libraries(
+        snark_crypto
+        ${CRYPTO_LIBRARIES}
+)
+
 install(
   DIRECTORY "" DESTINATION "include/libsnark"
   FILES_MATCHING
@@ -288,19 +300,6 @@ target_link_libraries(
 )
 
 add_executable(
-        profile_r1cs_gg_ppadscsnark
-        EXCLUDE_FROM_ALL
-
-        zk_proof_systems/ppadscsnark/r1cs_gg_ppadscsnark/profiling/profile_r1cs_gg_ppadscsnark.cpp
-)
-target_link_libraries(
-        profile_r1cs_gg_ppadscsnark
-
-        ${Boost_LIBRARIES}
-        snark
-)
-
-add_executable(
         profile_r1cs_gg_ppzkadscsnark
         EXCLUDE_FROM_ALL
 
@@ -311,6 +310,7 @@ target_link_libraries(
 
         ${Boost_LIBRARIES}
         snark
+        snark_crypto
 )
 
 if("${WITH_SUPERCOP}")
@@ -403,6 +403,32 @@ target_link_libraries(
   common_routing_algorithms_test
 
   snark
+)
+
+add_executable(
+  common_crypto_digest_test
+  EXCLUDE_FROM_ALL
+
+  common/crypto/tests/test_digest.cpp
+)
+target_link_libraries(
+  common_crypto_digest_test
+
+  snark
+  snark_crypto
+)
+
+add_executable(
+    common_crypto_signature_test
+    EXCLUDE_FROM_ALL
+
+    common/crypto/tests/test_signature.cpp
+)
+target_link_libraries(
+    common_crypto_signature_test
+
+    snark
+    snark_crypto
 )
 
 add_executable(
@@ -636,17 +662,6 @@ target_link_libraries(
   snark
 )
 
-add_executable(
-        zk_proof_systems_r1cs_gg_ppadscsnark_test
-        EXCLUDE_FROM_ALL
-
-        zk_proof_systems/ppadscsnark/r1cs_gg_ppadscsnark/tests/test_r1cs_gg_ppadscsnark.cpp
-)
-target_link_libraries(
-        zk_proof_systems_r1cs_gg_ppadscsnark_test
-
-        snark
-)
 
 add_executable(
         zk_proof_systems_r1cs_gg_ppzkadscsnark_test
@@ -658,6 +673,7 @@ target_link_libraries(
         zk_proof_systems_r1cs_gg_ppzkadscsnark_test
 
         snark
+        snark_crypto
 )
 
 add_executable(
@@ -858,10 +874,6 @@ add_test(
   COMMAND zk_proof_systems_r1cs_gg_ppzksnark_test
 )
 add_test(
-        NAME zk_proof_systems_r1cs_gg_ppadscsnark_test
-        COMMAND zk_proof_systems_r1cs_gg_ppadscsnark_test
-)
-add_test(
         NAME zk_proof_systems_r1cs_gg_ppzkadscsnark_test
         COMMAND zk_proof_systems_r1cs_gg_ppzkadscsnark_test
 )
@@ -922,7 +934,6 @@ add_dependencies(check zk_proof_systems_bacs_ppzksnark_test)
 add_dependencies(check zk_proof_systems_r1cs_ppzksnark_test)
 add_dependencies(check zk_proof_systems_r1cs_se_ppzksnark_test)
 add_dependencies(check zk_proof_systems_r1cs_gg_ppzksnark_test)
-add_dependencies(check zk_proof_systems_r1cs_gg_ppadscsnark_test)
 add_dependencies(check zk_proof_systems_r1cs_gg_ppzkadscsnark_test)
 add_dependencies(check zk_proof_systems_lego_gro16_test)
 add_dependencies(check zk_proof_systems_lego_gro16_sc_test)

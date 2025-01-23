@@ -16,8 +16,9 @@
 
 #include <libff/common/profiling.hpp>
 
-#include <libsnark/zk_proof_systems/ppzksnark/legogro16/legogro16.hpp>
+#include <libsnark/zk_proof_systems/ppzksnark/legogro16/sc_legogro16.hpp>
 #include <libsnark/relations/constraint_satisfaction_problems/r1cs/r1cs_ext.hpp>
+
 namespace libsnark {
 
 template<typename ppT>
@@ -40,68 +41,60 @@ bool run_lego_gro16_sc(r1cs_sc_example<libff::Fr<ppT>> &example,
         assert(constraint_system.is_satisfied(example.primary_input[t], auxiliary_input));
     }
 
-    libff::print_header("R1CS LegoGro16 Generator");
-    pedersen_commitment_key<ppT> ck = pedersen_commitment_generator<ppT>(constraint_system.commitment_size);
-    pedersen_commitment_pair<ppT> cp0 = pedersen_commitment_commit<ppT>(ck, example.state_assignment[0]);
-    lego_gro16_keypair<ppT> keypair = lego_gro16_generator<ppT>(ck, constraint_system);
-
+    libff::print_header("R1CS SC LegoGro16 Generator");
+    sc_lego_gro16_keypair<ppT> keypair = sc_lego_gro16_generator<ppT>(constraint_system, example.state_assignment[0]);
     printf("\n"); libff::print_indent(); libff::print_mem("after generator");
 
     libff::print_header("Preprocess verification key");
-    lego_gro16_processed_verification_key<ppT> pvk = lego_gro16_verifier_process_vk<ppT>(keypair.vk);
+    sc_lego_gro16_processed_verification_key<ppT> pvk = sc_lego_gro16_verifier_process_vk<ppT>(keypair.vk);
 
     if (test_serialization)
     {
         libff::enter_block("Test serialization of keys");
-        keypair.pk = libff::reserialize<lego_gro16_proving_key<ppT> >(keypair.pk);
-        keypair.vk = libff::reserialize<lego_gro16_verification_key<ppT> >(keypair.vk);
-        pvk = libff::reserialize<lego_gro16_processed_verification_key<ppT> >(pvk);
+        keypair.pk = libff::reserialize<sc_lego_gro16_proving_key<ppT> >(keypair.pk);
+        keypair.vk = libff::reserialize<sc_lego_gro16_verification_key<ppT> >(keypair.vk);
+        pvk = libff::reserialize<sc_lego_gro16_processed_verification_key<ppT> >(pvk);
         libff::leave_block("Test serialization of keys");
     }
 
-    pedersen_commitment_pair<ppT> previous_cp  = cp0;
+    sc_lego_gro16_commitment<ppT> previous_commitment = keypair.initial_commitment;
+    sc_lego_gro16_prover_state<ppT> prover_state = keypair.initial_prover_state;
     bool result = true;
     for(size_t t = 0; t < iterations; ++t) {
-        libff::print_header("R1CS LegoGro16 Prover");
-        r1cs_variable_assignment<libff::Fr<ppT>> auxiliary_input(example.state_assignment[t]);
-        auxiliary_input.insert(auxiliary_input.end(), example.state_assignment[t+1].begin(), example.state_assignment[t+1].end());
-        auxiliary_input.insert(auxiliary_input.end(), example.witness_assignment[t].begin(), example.witness_assignment[t].end());
+        libff::print_header("R1CS SC LegoGro16 Prover");
 
-        pedersen_commitment_pair<ppT> cp = pedersen_commitment_commit<ppT>(ck, example.state_assignment[t+1]);
-        lego_gro16_proof<ppT> proof = lego_gro16_prover<ppT>(keypair.pk,
-                                                             constraint_system,
-                                                             example.primary_input[t],
-                                                             {previous_cp.commitment, cp.commitment},
-                                                             {previous_cp.opening, cp.opening},
-                                                             auxiliary_input);
-        printf("\n");
-        libff::print_indent();
-        libff::print_mem("after prover");
+        std::pair<sc_lego_gro16_proof<ppT>, sc_lego_gro16_commitment<ppT>> proof =
+                                                                sc_lego_gro16_prover<ppT>(keypair.pk,
+                                                                                     constraint_system,
+                                                                                     example.primary_input[t],
+                                                                                     example.state_assignment[t],
+                                                                                     example.state_assignment[t+1],
+                                                                                     example.witness_assignment[t],
+                                                                                     prover_state);
+        printf("\n"); libff::print_indent(); libff::print_mem("after prover");
 
         if (test_serialization) {
             libff::enter_block("Test serialization of proof");
-            proof = libff::reserialize<lego_gro16_proof<ppT> >(proof);
+            proof.first = libff::reserialize<sc_lego_gro16_proof<ppT> >(proof.first);
+            proof.second = libff::reserialize<sc_lego_gro16_commitment<ppT> >(proof.second);
             libff::leave_block("Test serialization of proof");
         }
 
-        libff::print_header("R1CS LegoGro16 Verifier");
-        bool ans = lego_gro16_verifier_strong_IC<ppT>(keypair.vk, example.primary_input[t], {previous_cp.commitment, cp.commitment}, proof);
+        libff::print_header("R1CS SC LegoGro16 Verifier");
+        bool ans = sc_lego_gro16_verifier_strong_IC<ppT>(keypair.vk, example.primary_input[t], proof.first, proof.second, previous_commitment);
 
         printf("\n");
         libff::print_indent();
         libff::print_mem("after verifier");
         printf("* The verification result is: %s\n", (ans ? "PASS" : "FAIL"));
 
-        libff::print_header("R1CS LegoGro16 Online Verifier");
+        libff::print_header("R1CS SC LegoGro16 Online Verifier");
 #ifndef NDEBUG
-        bool ans2 = lego_gro16_online_verifier_strong_IC<ppT>(pvk, example.primary_input[t], {previous_cp.commitment, cp.commitment}, proof);
+        bool ans2 = sc_lego_gro16_online_verifier_strong_IC<ppT>(pvk, example.primary_input[t], proof.first, proof.second, previous_commitment);
 #endif
         assert(ans == ans2);
-        previous_cp = cp;
+        previous_commitment = proof.second;
         result = result && ans;
-        if (!result){
-            return result;
-        }
     }
 
     libff::leave_block("Call to run_lego_gro16_sc");

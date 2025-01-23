@@ -82,6 +82,7 @@ void display_info(){
 }
 
 adsnark_profile_t profile_r1cs_ppzkadsnark(
+        bool public_verifiability,
         size_t num_constraints,
         size_t private_input_size,
         size_t samples){
@@ -144,9 +145,16 @@ adsnark_profile_t profile_r1cs_ppzkadsnark(
     }
 
     for(size_t t = 0; t < samples; ++t) {
+        std::vector<r1cs_ppzkadsnark_auth_data<PP>> auth_data;
+
         tstart = libff::get_nsec_cpu_time();
-        std::vector<r1cs_ppzkadsnark_auth_data<PP>> auth_data =
-                r1cs_ppzkadsnark_auth_sign_symmetric<PP>(data,auth_keys.sak,labels);
+        if (public_verifiability)
+        {
+            auth_data = r1cs_ppzkadsnark_auth_sign<PP>(data,auth_keys.sak,labels);
+        }else
+        {
+            auth_data = r1cs_ppzkadsnark_auth_sign_symmetric<PP>(data,auth_keys.sak,labels);
+        }
         tend = libff::get_nsec_cpu_time();
         profile_measurements[t].authentication_runtime = tend - tstart;
 
@@ -163,10 +171,21 @@ adsnark_profile_t profile_r1cs_ppzkadsnark(
 
         if(t == 0){
             profile_result.proof_size = libff::get_serialized_size(proof);
+            if (public_verifiability)
+            {
+                profile_result.proof_size += libff::get_serialized_size(auth_data);
+            }
         }
 
         tstart = libff::get_nsec_cpu_time();
-        bool verified = r1cs_ppzkadsnark_online_verifier(pvk, proof, auth_keys.sak, labels);
+        bool verified;
+        if (public_verifiability)
+        {
+            verified = r1cs_ppzkadsnark_online_verifier(pvk, auth_data, proof, auth_keys.pak, labels);
+        } else
+        {
+            verified = r1cs_ppzkadsnark_online_verifier(pvk, proof, auth_keys.sak, labels);
+        }
         tend = libff::get_nsec_cpu_time();
         profile_measurements[t].verifier_runtime = tend - tstart;
 
@@ -218,12 +237,15 @@ int main(int argc, const char * argv[])
     int num_constraints;
     int samples;
     int state_size;
+    bool public_verifiability;
 
     PP::init_public_params();
 
+#ifndef DEBUG
     // We do not want to print profiling info at runtime, we will print results at the end
     libff::inhibit_profiling_info = true;
     libff::inhibit_profiling_counters = true;
+#endif
 
     std::cout << "Running " APPLICATION_NAME << std::endl;
 
@@ -238,7 +260,8 @@ int main(int argc, const char * argv[])
             ("private-inputs,i", po::value< std::vector<int> >(&private_inputs_range)->multitoken()->default_value(std::vector<int>{10}, "10"),
                     "2^x number of private inputs. Single number or range: start end [stepsize]")
             ("state-size,s", po::value<int>(&state_size)->default_value(-1),
-             "state-size. Must be -1 (not supported)");;
+             "state-size. Must be -1 (not supported)")
+            ("public-verifiability", po::value<bool>(&public_verifiability)->default_value(true), "enable public verifiability (true), or use designated verifier (false)");
 
     po::store(po::parse_command_line(argc, argv, desc), vm);
     po::notify(vm);
@@ -272,6 +295,7 @@ int main(int argc, const char * argv[])
         adsnark_profile_t profile;
 
         libff::print_header("Profiling");
+        std::cout << "Public verifiability: " << public_verifiability << std::endl;
         std::cout << "Num constraints: " << pow2(num_constraints) << " (2^" << num_constraints << ")" << std::endl;
         std::cout << "Public IO size: " << pow2(public_io_size) << " (2^" << public_io_size << ")" << std::endl;
         std::cout << "Security Parameter: " << libff::Fr<PP::snark_pp>::num_bits << std::endl;
@@ -280,7 +304,9 @@ int main(int argc, const char * argv[])
         for(int private_inputs_num = private_inputs_range[0];
         private_inputs_num <= private_inputs_range[1];
         private_inputs_num += private_inputs_range[2]){
-            profile = profile_r1cs_ppzkadsnark(pow2(num_constraints),
+            profile = profile_r1cs_ppzkadsnark(
+                                                public_verifiability,
+                                                pow2(num_constraints),
                                                pow2(private_inputs_num),
                                                samples);
             std::cout << pow2(private_inputs_num) << ", " << 0 << ", "

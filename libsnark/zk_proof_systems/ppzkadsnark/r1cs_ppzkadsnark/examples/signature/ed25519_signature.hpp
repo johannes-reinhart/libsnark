@@ -25,7 +25,12 @@ namespace libsnark {
 class ed25519_sigT {
 public:
     unsigned char sig_bytes[64];
+    ed25519_sigT() : sig_bytes{} {
+    }
 };
+
+inline std::ostream& operator<<(std::ostream &out, const ed25519_sigT &sig);
+
 
 class ed25519_vkT {
 public:

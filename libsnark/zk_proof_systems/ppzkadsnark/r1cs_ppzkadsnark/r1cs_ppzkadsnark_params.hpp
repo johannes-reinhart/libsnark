@@ -21,7 +21,8 @@ namespace libsnark {
 class labelT {
 public:
     unsigned char label_bytes[16];
-    labelT() {};
+    labelT() : label_bytes{}
+    {};
 };
 
 /**

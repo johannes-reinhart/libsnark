@@ -40,13 +40,14 @@ bool run_r1cs_gg_ppzkadscsnark(r1cs_adsc_example<libff::Fr<ppT>> &example,
                              size_t private_input_size,
                              size_t state_size,
                              size_t iterations,
-                             const bool test_serialization)
+                             bool test_serialization)
 {
     libff::enter_block("Call to run_r1cs_gg_ppzkadscsnark");
 
-    libff::enter_block("Call to r1cs_to_r1cs_adsc");
-    r1cs_gg_ppzkadscsnark_constraint_system<ppT> constraint_system = r1cs_to_r1cs_adsc(std::move(example.constraint_system), private_input_size, state_size);
-    libff::leave_block("Call to r1cs_to_r1cs_adsc");
+    libff::enter_block("Optimise R1CS");
+    r1cs_gg_ppzkadscsnark_constraint_system<ppT> constraint_system(std::move(example.constraint_system), private_input_size, state_size);
+    constraint_system.swap_AB_if_beneficial();
+    libff::leave_block("Optimise R1CS");
 
     // Check that constraint system is satisfied within each iteration
     for(size_t t = 0; t < iterations; ++t){
@@ -72,64 +73,62 @@ bool run_r1cs_gg_ppzkadscsnark(r1cs_adsc_example<libff::Fr<ppT>> &example,
         for(size_t i = 0; i < keypair.aks.size(); ++i){
             keypair.aks[i] = libff::reserialize<r1cs_gg_ppzkadscsnark_authentication_key<ppT> >(keypair.aks[i]);
         }
+        keypair.initial_commitment = libff::reserialize<r1cs_gg_ppzkadscsnark_commitment<ppT> >(keypair.initial_commitment);
         pvk = libff::reserialize<r1cs_gg_ppzkadscsnark_processed_verification_key<ppT> >(pvk);
         libff::leave_block("Test serialization of keys");
     }
 
-    r1cs_gg_ppzkadscsnark_proof<ppT> previous_proof = keypair.initial_proof;
-    r1cs_gg_ppzkadscsnark_prover_state<ppT> prover_state = keypair.initial_prover_state;
+    r1cs_gg_ppzkadscsnark_commitment<ppT> previous_commitment = keypair.initial_commitment;
+    r1cs_gg_ppzkadscsnark_prover_state<ppT> prover_state;
     bool result = true;
     for(size_t t = 0; t < iterations; ++t) {
         libff::print_header("R1CS GG-ppZKADSCSNARK Authenticator");
-        r1cs_gg_ppzkadscsnark_authentication_tags<ppT> tags = r1cs_gg_ppzkadscsnark_authenticate(keypair.aks[0], constraint_system.primary_input_size + 1, t, example.private_input[t]);
+        r1cs_gg_ppzkadscsnark_authenticated_input<ppT> authenticated_input = r1cs_gg_ppzkadscsnark_authenticate(keypair.aks[0], t, example.private_input[t]);
 
         if (test_serialization)
         {
-            libff::enter_block("Test serialization of authentication tags");
-            tags = libff::reserialize<r1cs_gg_ppzkadscsnark_authentication_tags<ppT> >(tags);
-            libff::leave_block("Test serialization of authentication tags");
+            libff::enter_block("Test serialization of authenticated input");
+            authenticated_input = libff::reserialize<r1cs_gg_ppzkadscsnark_authenticated_input<ppT> >(authenticated_input);
+            libff::leave_block("Test serialization of authenticated input");
         }
 
         libff::print_header("R1CS GG-ppZKADSCSNARK Prover");
-        r1cs_variable_assignment<libff::Fr<ppT>> auxiliary_input(example.private_input[t]);
-        auxiliary_input.insert(auxiliary_input.end(), example.state_assignment[t].begin(), example.state_assignment[t].end());
-        auxiliary_input.insert(auxiliary_input.end(), example.state_assignment[t+1].begin(), example.state_assignment[t+1].end());
-        auxiliary_input.insert(auxiliary_input.end(), example.witness_assignment[t].begin(), example.witness_assignment[t].end());
-        r1cs_gg_ppzkadscsnark_proof<ppT> proof = r1cs_gg_ppzkadscsnark_prover<ppT>(keypair.pk,
+        std::pair<r1cs_gg_ppzkadscsnark_proof<ppT>, r1cs_gg_ppzkadscsnark_commitment<ppT>> proof
+                                                        = r1cs_gg_ppzkadscsnark_prover<ppT>(keypair.pk,
                                                                            constraint_system,
                                                                            example.primary_input[t],
-                                                                           auxiliary_input,
-                                                                           tags,
+                                                                           {authenticated_input},
+                                                                           example.state_assignment[t],
+                                                                           example.state_assignment[t+1],
+                                                                           example.witness_assignment[t],
                                                                            prover_state);
         printf("\n"); libff::print_indent(); libff::print_mem("after prover");
 
         if (test_serialization)
         {
             libff::enter_block("Test serialization of proof");
-            proof = libff::reserialize<r1cs_gg_ppzkadscsnark_proof<ppT> >(proof);
+            proof.first = libff::reserialize<r1cs_gg_ppzkadscsnark_proof<ppT> >(proof.first);
+            proof.second = libff::reserialize<r1cs_gg_ppzkadscsnark_commitment<ppT> >(proof.second);
             libff::leave_block("Test serialization of proof");
         }
 
         libff::print_header("R1CS GG-ppZKADSCSNARK Verifier");
-        const bool ans = r1cs_gg_ppzkadscsnark_verifier_strong_IC<ppT>(keypair.vk, example.primary_input[t], proof, previous_proof, t);
+        const bool ans = r1cs_gg_ppzkadscsnark_verifier_strong_IC<ppT>(keypair.vk, example.primary_input[t],
+            proof.first, proof.second, previous_commitment, t);
         printf("\n"); libff::print_indent(); libff::print_mem("after verifier");
         printf("* The verification result is: %s\n", (ans ? "PASS" : "FAIL"));
 
         libff::print_header("R1CS GG-ppZKADSCSNARK Online Verifier");
     #ifndef NDEBUG
-        const bool ans2 = r1cs_gg_ppzkadscsnark_online_verifier_strong_IC<ppT>(pvk, example.primary_input[t], proof, previous_proof, t);
+        const bool ans2 = r1cs_gg_ppzkadscsnark_online_verifier_strong_IC<ppT>(pvk, example.primary_input[t],
+            proof.first, proof.second, previous_commitment, t);
     #endif
         assert(ans == ans2);
-        previous_proof = proof;
+        previous_commitment = proof.second;
         result = result && ans;
-        if (!result){
-            return result;
-        }
     }
 
-
     libff::leave_block("Call to run_r1cs_gg_ppzkadscsnark");
-
     return result;
 }
 

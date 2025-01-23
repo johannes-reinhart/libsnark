@@ -24,6 +24,7 @@ template<typename FieldT>
 class structured_protoboard : public protoboard<FieldT>{
 private:
     std::map<size_t, block_info_t> blocks;
+    size_t last_block_id;
 
 public:
     structured_protoboard();
@@ -33,6 +34,7 @@ public:
     size_t get_block_allocated_variables(size_t blockid) const;
     bool blocks_fully_allocated() const;
     r1cs_variable_assignment<FieldT> get_block_assignment(size_t blockid) const;
+    r1cs_variable_assignment<FieldT> get_free_assignment() const;
 
     void reserve_block(size_t blockid, size_t size);
 
