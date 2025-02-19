@@ -79,10 +79,17 @@ add_library(
         STATIC
         common/crypto/digest/sha.cpp
         common/crypto/signature/eddsa.cpp
+        common/crypto/mac/hmac.cpp
 )
 target_link_libraries(
         snark_crypto
         ${CRYPTO_LIBRARIES}
+)
+target_include_directories(
+        snark_crypto
+
+        PUBLIC
+        ${DEPENDS_DIR}/libff
 )
 
 install(
@@ -313,6 +320,20 @@ target_link_libraries(
         snark_crypto
 )
 
+add_executable(
+        profile_r1cs_gg_ppzkadscsnark_dv
+        EXCLUDE_FROM_ALL
+
+        zk_proof_systems/ppadscsnark/r1cs_gg_ppzkadscsnark_dv/profiling/profile_r1cs_gg_ppzkadscsnark_dv.cpp
+)
+target_link_libraries(
+        profile_r1cs_gg_ppzkadscsnark_dv
+
+        ${Boost_LIBRARIES}
+        snark
+        snark_crypto
+)
+
 if("${WITH_SUPERCOP}")
   add_executable(
           profile_r1cs_ppzkadsnark
@@ -429,6 +450,19 @@ target_link_libraries(
 
     snark
     snark_crypto
+)
+
+add_executable(
+        common_crypto_mac_test
+        EXCLUDE_FROM_ALL
+
+        common/crypto/tests/test_mac.cpp
+)
+target_link_libraries(
+        common_crypto_mac_test
+
+        snark
+        snark_crypto
 )
 
 add_executable(
@@ -662,7 +696,6 @@ target_link_libraries(
   snark
 )
 
-
 add_executable(
         zk_proof_systems_r1cs_gg_ppzkadscsnark_test
         EXCLUDE_FROM_ALL
@@ -671,6 +704,19 @@ add_executable(
 )
 target_link_libraries(
         zk_proof_systems_r1cs_gg_ppzkadscsnark_test
+
+        snark
+        snark_crypto
+)
+
+add_executable(
+        zk_proof_systems_r1cs_gg_ppzkadscsnark_dv_test
+        EXCLUDE_FROM_ALL
+
+        zk_proof_systems/ppadscsnark/r1cs_gg_ppzkadscsnark_dv/tests/test_r1cs_gg_ppzkadscsnark_dv.cpp
+)
+target_link_libraries(
+        zk_proof_systems_r1cs_gg_ppzkadscsnark_dv_test
 
         snark
         snark_crypto
@@ -872,6 +918,10 @@ add_test(
 add_test(
   NAME zk_proof_systems_r1cs_gg_ppzksnark_test
   COMMAND zk_proof_systems_r1cs_gg_ppzksnark_test
+)
+add_test(
+        NAME zk_proof_systems_r1cs_gg_ppadscsnark_test
+        COMMAND zk_proof_systems_r1cs_gg_ppadscsnark_test
 )
 add_test(
         NAME zk_proof_systems_r1cs_gg_ppzkadscsnark_test

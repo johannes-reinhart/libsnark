@@ -1,6 +1,6 @@
 /** @file
  *****************************************************************************
- Profiling program that exercises the ppADSCSNARK (first generator, then prover,
+ Profiling program that exercises the designated verifier ppADSCSNARK (first generator, then prover,
  then verifier) on a synthetic R1CS instance.
 
  *****************************************************************************/
@@ -11,18 +11,17 @@
 #include <libff/common/profiling.hpp>
 #include <libff/common/utils.hpp>
 #include <libff/common/default_types/ec_pp.hpp>
-#include <libsnark/common/curve/curve_properties.hpp>
 
-#include <libsnark/common/default_types/r1cs_gg_ppzkadscsnark_pp.hpp>
+#include <libsnark/common/default_types/r1cs_gg_ppzkadscsnark_dv_pp.hpp>
 #include <libsnark/relations/constraint_satisfaction_problems/r1cs/examples/r1cs_ext_examples.hpp>
-#include <libsnark/zk_proof_systems/ppadscsnark/r1cs_gg_ppzkadscsnark/examples/run_r1cs_gg_ppzkadscsnark.hpp>
+#include <libsnark/zk_proof_systems/ppadscsnark/r1cs_gg_ppzkadscsnark_dv/examples/run_r1cs_gg_ppzkadscsnark_dv.hpp>
 #include <libsnark/reductions/r1cs_to_r1cs/r1cs_to_r1cs.hpp>
 
 
-#define APPLICATION_NAME "zk ADSC-SNARK profiling application"
+#define APPLICATION_NAME "zk ADSC-SNARK dv profiling application"
 
 using namespace libsnark;
-typedef default_r1cs_gg_ppzkadscsnark_pp PP;
+typedef default_r1cs_gg_ppzkadscsnark_dv_pp PP;
 
 struct adscsnark_profile_t {
     size_t public_inputs_size;
@@ -64,7 +63,7 @@ void display_info(){
     std::cout << "Scalar field size " << libff::Fr<PP>::num_bits << " bits" << std::endl;
 }
 
-adscsnark_profile_t profile_r1cs_gg_ppzkadscsnark(
+adscsnark_profile_t profile_r1cs_gg_ppzkadscsnark_dv(
         size_t num_constraints,
         size_t public_io_size,
         size_t private_input_size,
@@ -93,32 +92,32 @@ adscsnark_profile_t profile_r1cs_gg_ppzkadscsnark(
     };
 
     r1cs_adsc_example<libff::Fr<PP> > example = generate_r1cs_adsc_example_with_field_input<libff::Fr<PP> >(num_constraints, public_io_size, private_input_size, state_size, samples);
-    r1cs_gg_ppzkadscsnark_constraint_system<PP> constraint_system(std::move(example.constraint_system), private_input_size, state_size);
+    r1cs_gg_ppzkadscsnark_dv_constraint_system<PP> constraint_system(std::move(example.constraint_system), private_input_size, state_size);
     constraint_system.swap_AB_if_beneficial();
     profile_result.witness_size = constraint_system.num_variables() - public_io_size - private_input_size - 2*state_size;
     profile_result.circuit_num_constraints = constraint_system.num_constraints();
 
     tstart = libff::get_nsec_cpu_time();
-    r1cs_gg_ppzkadscsnark_keypair<PP> keypair = r1cs_gg_ppzkadscsnark_generator<PP>(constraint_system, example.state_assignment[0]);
+    r1cs_gg_ppzkadscsnark_dv_keypair<PP> keypair = r1cs_gg_ppzkadscsnark_dv_generator<PP>(constraint_system, example.state_assignment[0]);
     tend = libff::get_nsec_cpu_time();
     profile_result.generator_runtime = tend - tstart;
 
     tstart = libff::get_nsec_cpu_time();
-    r1cs_gg_ppzkadscsnark_processed_verification_key<PP> pvk = r1cs_gg_ppzkadscsnark_verifier_process_vk<PP>(keypair.vk);
+    r1cs_gg_ppzkadscsnark_dv_processed_verification_key<PP> pvk = r1cs_gg_ppzkadscsnark_dv_verifier_process_vk<PP>(keypair.vk);
     tend = libff::get_nsec_cpu_time();
     profile_result.verifier_preprocessing_runtime = tend - tstart;
 
-    r1cs_gg_ppzkadscsnark_commitment<PP> previous_commitment = keypair.initial_commitment;
-    r1cs_gg_ppzkadscsnark_prover_state<PP> prover_state;
+    r1cs_gg_ppzkadscsnark_dv_commitment<PP> previous_commitment = keypair.initial_commitment;
+    r1cs_gg_ppzkadscsnark_dv_prover_state<PP> prover_state;
     for(size_t t = 0; t < samples; ++t) {
         tstart = libff::get_nsec_cpu_time();
-        r1cs_gg_ppzkadscsnark_authenticated_input<PP> authenticated_input = r1cs_gg_ppzkadscsnark_authenticate(keypair.aks[0], t, example.private_input[t]);
+        r1cs_gg_ppzkadscsnark_dv_authenticated_input<PP> authenticated_input = r1cs_gg_ppzkadscsnark_dv_authenticate(keypair.aks[0], t, example.private_input[t]);
         tend = libff::get_nsec_cpu_time();
         profile_measurements[t].authentication_runtime = tend - tstart;
 
         tstart = libff::get_nsec_cpu_time();
-        std::pair<r1cs_gg_ppzkadscsnark_proof<PP>, r1cs_gg_ppzkadscsnark_commitment<PP>> proof
-                                            = r1cs_gg_ppzkadscsnark_prover<PP>(keypair.pk,
+        std::pair<r1cs_gg_ppzkadscsnark_dv_proof<PP>, r1cs_gg_ppzkadscsnark_dv_commitment<PP>> proof
+                                            = r1cs_gg_ppzkadscsnark_dv_prover<PP>(keypair.pk,
                                                                                constraint_system,
                                                                                example.primary_input[t],
                                                                                {authenticated_input},
@@ -134,7 +133,7 @@ adscsnark_profile_t profile_r1cs_gg_ppzkadscsnark(
         }
 
         tstart = libff::get_nsec_cpu_time();
-        bool verified = r1cs_gg_ppzkadscsnark_online_verifier_strong_IC<PP>(pvk, example.primary_input[t], proof.first,
+        bool verified = r1cs_gg_ppzkadscsnark_dv_online_verifier_strong_IC<PP>(pvk, example.primary_input[t], proof.first,
             proof.second, previous_commitment, t);
         tend = libff::get_nsec_cpu_time();
         profile_measurements[t].verifier_runtime = tend - tstart;
@@ -190,7 +189,6 @@ int main(int argc, const char * argv[])
     int samples;
 
     PP::init_public_params();
-    EC_Inner<PP>::init_public_params();
 
 #ifndef DEBUG
     // We do not want to print profiling info at runtime, we will print results at the end
@@ -262,7 +260,7 @@ int main(int argc, const char * argv[])
             for(int state_num = state_range[0];
                 state_num <= state_range[1];
                 state_num += state_range[2]) {
-                profile = profile_r1cs_gg_ppzkadscsnark(pow2(num_constraints),
+                profile = profile_r1cs_gg_ppzkadscsnark_dv(pow2(num_constraints),
                                                       pow2(public_io_size),
                                                       pow2(private_inputs_num),
                                                       pow2(state_num),

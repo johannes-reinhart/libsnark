@@ -3,13 +3,13 @@
 
 Implementation of interfaces for a ppZKADSCSNARK for R1CS.
 
-See r1cs_gg_ppzkadscsnark.hpp .
+See r1cs_gg_ppzkadscsnark_dv.hpp .
 
 
 *****************************************************************************/
 
-#ifndef R1CS_GG_PPZKADSCSNARK_TCC_
-#define R1CS_GG_PPZKADSCSNARK_TCC_
+#ifndef R1CS_GG_PPZKADSCSNARK_DV_TCC_
+#define R1CS_GG_PPZKADSCSNARK_DV_TCC_
 
 #include <algorithm>
 #include <cassert>
@@ -22,9 +22,7 @@ See r1cs_gg_ppzkadscsnark.hpp .
 #include <libff/common/utils.hpp>
 #include <libff/common/serialization.hpp>
 
-#include <libsnark/common/crypto/prf/prf.hpp>
-#include <libsnark/common/curve/curve_properties.hpp>
-
+#include <libsnark/common/crypto/mac/hmac.hpp>
 
 #ifdef MULTICORE
 #include <omp.h>
@@ -33,85 +31,40 @@ See r1cs_gg_ppzkadscsnark.hpp .
 #include <libsnark/knowledge_commitment/kc_multiexp.hpp>
 #include <libsnark/reductions/r1cs_to_plain_qap/r1cs_to_plain_qap.hpp>
 
+#include "r1cs_gg_ppzkadscsnark_dv.hpp"
+#include "r1cs_gg_ppzkadscsnark_dv_params.hpp"
+
 namespace libsnark {
 
 
 template<typename ppT>
-r1cs_gg_ppzkadscsnark_signature_keypair<ppT> r1cs_gg_ppzkadscsnark_signature_generate()
+r1cs_gg_ppzkadscsnark_dv_mac_key<ppT> r1cs_gg_ppzkadscsnark_dv_mac_generate()
 {
-#ifdef SIGNATURE_SNARKFRIENDLY
-    return eddsa_sf_generate<EC_Inner<ppT>>();
-#else
-    return signature_eddsa_generate();
-#endif
+    return hmac_sha256_generate_key();
 }
 
 template<typename ppT>
-r1cs_gg_ppzkadscsnark_signature_signature<ppT> r1cs_gg_ppzkadscsnark_signature_sign(const r1cs_gg_ppzkadscsnark_signature_privkey<ppT> &privkey, const libff::G1<ppT> &value, const r1cs_gg_ppzkadscsnark_label<ppT> &label)
+r1cs_gg_ppzkadscsnark_dv_mac<ppT> r1cs_gg_ppzkadscsnark_dv_mac_compute(const r1cs_gg_ppzkadscsnark_dv_mac_key<ppT> &key, const libff::G1<ppT> &value, const r1cs_gg_ppzkadscsnark_dv_label<ppT> &label)
 {
-#ifdef SIGNATURE_SNARKFRIENDLY
-    static const PoseidonParameters<ppT> param;
-
-    // Serialize value and label
-    std::vector<libff::Fq<EC_Inner<ppT>>> msg;
-    libff::G1<ppT> point(value);
-    point.to_affine_coordinates();
-    std::vector<uint8_t> bytes = point.X.to_bytes();
-    bytes.push_back(point.Y.to_bytes()[0]); // to get the right sign, we add some information from Y coordinate
-    // As point coordinates are slightly larger than inner curve base field, we split info into two field elements
-    size_t half = bytes.size() / 2;
-    libff::Fq<EC_Inner<ppT>> pt1, pt2;
-    pt1.from_bytes(std::vector<uint8_t>(bytes.begin(), bytes.begin() + half));
-    pt2.from_bytes(std::vector<uint8_t>(bytes.begin() + half, bytes.end()));
-
-    msg.reserve(3);
-    msg.push_back(pt1);
-    msg.push_back(pt2);
-    msg.push_back(libff::convert_field<libff::Fq<EC_Inner<ppT>>>(label));
-    return eddsa_poseidon_sign<EC_Inner<ppT>>(param, privkey, msg);
-#else
     // Serialize value || label
     std::stringstream ss;
     ss << value << label;
     std::string serialized = ss.str();
-    return signature_eddsa_sign(privkey, std::vector<uint8_t>(serialized.begin(), serialized.end()));
-#endif
+    return hmac_sha256_compute_mac(key, std::vector<uint8_t>(serialized.begin(), serialized.end()));
 }
 
 template<typename ppT>
-bool r1cs_gg_ppzkadscsnark_signature_verify(const r1cs_gg_ppzkadscsnark_signature_pubkey<ppT> &pubkey, const r1cs_gg_ppzkadscsnark_signature_signature<ppT> &sig, const libff::G1<ppT> &value, const r1cs_gg_ppzkadscsnark_label<ppT> &label)
+bool r1cs_gg_ppzkadscsnark_dv_mac_verify(const r1cs_gg_ppzkadscsnark_dv_mac_key<ppT> &key, const r1cs_gg_ppzkadscsnark_dv_mac<ppT> &mac, const libff::G1<ppT> &value, const r1cs_gg_ppzkadscsnark_dv_label<ppT> &label)
 {
-#ifdef SIGNATURE_SNARKFRIENDLY
-    static const PoseidonParameters<ppT> param;
-
-    // Serialize value and label
-    std::vector<libff::Fq<EC_Inner<ppT>>> msg;
-    libff::G1<ppT> point(value);
-    point.to_affine_coordinates();
-    std::vector<uint8_t> bytes = point.X.to_bytes();
-    bytes.push_back(point.Y.to_bytes()[0]); // to get the right sign, we add some information from Y coordinate
-    // As point coordinates are slightly larger than inner curve base field, we split info into two field elements
-    size_t half = bytes.size() / 2;
-    libff::Fq<EC_Inner<ppT>> pt1, pt2;
-    pt1.from_bytes(std::vector<uint8_t>(bytes.begin(), bytes.begin() + half));
-    pt2.from_bytes(std::vector<uint8_t>(bytes.begin() + half, bytes.end()));
-
-    msg.reserve(3);
-    msg.push_back(pt1);
-    msg.push_back(pt2);
-    msg.push_back(libff::convert_field<libff::Fq<EC_Inner<ppT>>>(label));
-    return eddsa_poseidon_verify<EC_Inner<ppT>>(param, pubkey, sig, msg);
-#else
     // Serialize D_g1 || label
     std::stringstream ss;
     ss << value << label;
     std::string serialized = ss.str();
-    return signature_eddsa_verify(pubkey, sig, std::vector<uint8_t>(serialized.begin(), serialized.end()));
-#endif
+    return hmac_sha256_verify_mac(key, mac, std::vector<uint8_t>(serialized.begin(), serialized.end()));
 }
 
 template<typename ppT>
-bool r1cs_gg_ppzkadscsnark_proving_key<ppT>::operator==(const r1cs_gg_ppzkadscsnark_proving_key<ppT> &other) const
+bool r1cs_gg_ppzkadscsnark_dv_proving_key<ppT>::operator==(const r1cs_gg_ppzkadscsnark_dv_proving_key<ppT> &other) const
 {
     return (this->alpha_g1 == other.alpha_g1 &&
             this->beta_g1 == other.beta_g1 &&
@@ -133,7 +86,7 @@ bool r1cs_gg_ppzkadscsnark_proving_key<ppT>::operator==(const r1cs_gg_ppzkadscsn
 }
 
 template<typename ppT>
-std::ostream& operator<<(std::ostream &out, const r1cs_gg_ppzkadscsnark_proving_key<ppT> &pk)
+std::ostream& operator<<(std::ostream &out, const r1cs_gg_ppzkadscsnark_dv_proving_key<ppT> &pk)
 {
     out << pk.alpha_g1 << OUTPUT_NEWLINE;
     out << pk.beta_g1 << OUTPUT_NEWLINE;
@@ -156,7 +109,7 @@ std::ostream& operator<<(std::ostream &out, const r1cs_gg_ppzkadscsnark_proving_
 }
 
 template<typename ppT>
-std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_proving_key<ppT> &pk)
+std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_dv_proving_key<ppT> &pk)
 {
     in >> pk.alpha_g1;
     libff::consume_OUTPUT_NEWLINE(in);
@@ -188,161 +141,170 @@ std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_proving_key<ppT
 }
 
 template<typename ppT>
-bool r1cs_gg_ppzkadscsnark_verification_key<ppT>::operator==(const r1cs_gg_ppzkadscsnark_verification_key<ppT> &other) const
+bool r1cs_gg_ppzkadscsnark_dv_verification_key<ppT>::operator==(const r1cs_gg_ppzkadscsnark_dv_verification_key<ppT> &other) const
 {
     return (
-            this->gamma_g2 == other.gamma_g2 &&
-            this->delta_g2 == other.delta_g2 &&
-            this->epsilon_g2 == other.epsilon_g2 &&
-            this->eta_g2 == other.eta_g2 &&
-            this->kappa_g2 == other.kappa_g2 &&
+            this->one_g1 == other.one_g1 &&
+            this->one_m_g2 == other.one_m_g2 &&
+            this->delta == other.delta &&
+            this->epsilon == other.epsilon &&
+            this->eta == other.eta &&
+            this->kappa == other.kappa &&
             this->Pi_statement == other.Pi_statement &&
             this->alpha_g1_beta_g2 == other.alpha_g1_beta_g2 &&
-            this->pubkeys == other.pubkeys
+            this->mac_keys == other.mac_keys
             );
 }
 
 
 template<typename ppT>
-std::ostream& operator<<(std::ostream &out, const r1cs_gg_ppzkadscsnark_verification_key<ppT> &vk)
+std::ostream& operator<<(std::ostream &out, const r1cs_gg_ppzkadscsnark_dv_verification_key<ppT> &vk)
 {
-    out << vk.gamma_g2 << OUTPUT_NEWLINE;
-    out << vk.delta_g2 << OUTPUT_NEWLINE;
-    out << vk.epsilon_g2 << OUTPUT_NEWLINE;
-    out << vk.eta_g2 << OUTPUT_NEWLINE;
-    out << vk.kappa_g2 << OUTPUT_NEWLINE;
+    out << vk.one_g1 << OUTPUT_NEWLINE;
+    out << vk.one_m_g2 << OUTPUT_NEWLINE;
+    out << vk.delta << OUTPUT_NEWLINE;
+    out << vk.epsilon << OUTPUT_NEWLINE;
+    out << vk.eta << OUTPUT_NEWLINE;
+    out << vk.kappa << OUTPUT_NEWLINE;
     out << vk.Pi_statement << OUTPUT_NEWLINE;
     out << vk.alpha_g1_beta_g2 << OUTPUT_NEWLINE;
-    libff::operator<<(out, vk.pubkeys) << OUTPUT_NEWLINE;
+    libff::operator<<(out, vk.mac_keys) << OUTPUT_NEWLINE;
 
     return out;
 }
 
 template<typename ppT>
-std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_verification_key<ppT> &vk)
+std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_dv_verification_key<ppT> &vk)
 {
-    in >> vk.gamma_g2;
+    in >> vk.one_g1;
     libff::consume_OUTPUT_NEWLINE(in);
-    in >> vk.delta_g2;
+    in >> vk.one_m_g2;
     libff::consume_OUTPUT_NEWLINE(in);
-    in >> vk.epsilon_g2;
+    in >> vk.delta;
     libff::consume_OUTPUT_NEWLINE(in);
-    in >> vk.eta_g2;
+    in >> vk.epsilon;
     libff::consume_OUTPUT_NEWLINE(in);
-    in >> vk.kappa_g2;
+    in >> vk.eta;
+    libff::consume_OUTPUT_NEWLINE(in);
+    in >> vk.kappa;
     libff::consume_OUTPUT_NEWLINE(in);
     in >> vk.Pi_statement;
     libff::consume_OUTPUT_NEWLINE(in);
     in >> vk.alpha_g1_beta_g2;
     libff::consume_OUTPUT_NEWLINE(in);
-    libff::operator>>(in, vk.pubkeys);
+    libff::operator>>(in, vk.mac_keys);
     libff::consume_OUTPUT_NEWLINE(in);
     return in;
 }
 
 template<typename ppT>
-r1cs_gg_ppzkadscsnark_verification_key<ppT> r1cs_gg_ppzkadscsnark_verification_key<ppT>::dummy_verification_key(size_t input_size, size_t signatures)
+r1cs_gg_ppzkadscsnark_dv_verification_key<ppT> r1cs_gg_ppzkadscsnark_dv_verification_key<ppT>::dummy_verification_key(size_t input_size, size_t signatures)
 {
-    r1cs_gg_ppzkadscsnark_verification_key<ppT> result;
-    result.gamma_g2 = libff::G2<ppT>::random_element();
-    result.delta_g2 = libff::G2<ppT>::random_element();
-    result.epsilon_g2 = libff::G2<ppT>::random_element();
-    result.eta_g2 = libff::G2<ppT>::random_element();
-    result.kappa_g2 = libff::G2<ppT>::random_element();
+    r1cs_gg_ppzkadscsnark_dv_verification_key<ppT> result;
+    result.one_g1 = libff::G1<ppT>::random_element();
+    result.one_m_g2 = libff::G2<ppT>::random_element();
+    result.delta = libff::Fr<ppT>::random_element();
+    result.epsilon = libff::Fr<ppT>::random_element();
+    result.eta = libff::Fr<ppT>::random_element();
+    result.kappa = libff::Fr<ppT>::random_element();
 
-    libff::G1_vector<ppT> v;
+    libff::Fr_vector<ppT> v;
     for (size_t i = 0; i < input_size; ++i)
     {
-        v.emplace_back(libff::G1<ppT>::random_element());
+        v.emplace_back(libff::Fr<ppT>::random_element());
     }
 
     result.Pi_statement = v;
     result.alpha_g1_beta_g2 = libff::Fr<ppT>::random_element() * libff::GT<ppT>::random_element();
 
-    std::vector<r1cs_gg_ppzkadscsnark_signature_pubkey<ppT>> pubkeys;
+    std::vector<r1cs_gg_ppzkadscsnark_dv_mac_key<ppT>> mac_keys;
     for (size_t i = 0; i < signatures; ++i)
     {
-        r1cs_gg_ppzkadscsnark_signature_keypair<ppT> keypair;
-        keypair = r1cs_gg_ppzkadscsnark_signature_generate<ppT>();
-        pubkeys.push_back(keypair.pubkey);
+        r1cs_gg_ppzkadscsnark_dv_mac_key<ppT> mac_key;
+        mac_key = r1cs_gg_ppzkadscsnark_dv_mac_generate<ppT>();
+        mac_keys.push_back(mac_key);
     }
 
-    result.pubkeys = pubkeys;
+    result.mac_keys = mac_keys;
     return result;
 }
 
 template<typename ppT>
-bool r1cs_gg_ppzkadscsnark_processed_verification_key<ppT>::operator==(const r1cs_gg_ppzkadscsnark_processed_verification_key<ppT> &other) const
+bool r1cs_gg_ppzkadscsnark_dv_processed_verification_key<ppT>::operator==(const r1cs_gg_ppzkadscsnark_dv_processed_verification_key<ppT> &other) const
 {
     return (
         this->Pi_statement == other.Pi_statement &&
         this->alpha_g1_beta_g2 == other.alpha_g1_beta_g2 &&
-        this->gamma_m_g2_precomp == other.gamma_m_g2_precomp &&
-        this->delta_g2_precomp == other.delta_g2_precomp &&
-        this->epsilon_g2_precomp == other.epsilon_g2_precomp &&
-        this->eta_g2_precomp == other.eta_g2_precomp &&
-        this->kappa_g2_precomp == other.kappa_g2_precomp &&
-        this->pubkeys == other.pubkeys
+        this->one_g1 == other.one_g1 &&
+        this->one_m_g2_precomp == other.one_m_g2_precomp &&
+        this->delta == other.delta &&
+        this->epsilon == other.epsilon &&
+        this->eta == other.eta &&
+        this->kappa == other.kappa &&
+        this->mac_keys == other.mac_keys
     );
 }
 
 template<typename ppT>
-std::ostream& operator<<(std::ostream &out, const r1cs_gg_ppzkadscsnark_processed_verification_key<ppT> &pvk)
+std::ostream& operator<<(std::ostream &out, const r1cs_gg_ppzkadscsnark_dv_processed_verification_key<ppT> &pvk)
 {
     out << pvk.Pi_statement << OUTPUT_NEWLINE;
     out << pvk.alpha_g1_beta_g2 << OUTPUT_NEWLINE;
-    out << pvk.gamma_m_g2_precomp << OUTPUT_NEWLINE;
-    out << pvk.delta_g2_precomp << OUTPUT_NEWLINE;
-    out << pvk.epsilon_g2_precomp << OUTPUT_NEWLINE;
-    out << pvk.eta_g2_precomp << OUTPUT_NEWLINE;
-    out << pvk.kappa_g2_precomp << OUTPUT_NEWLINE;
-    libff::operator<<(out, pvk.pubkeys) << OUTPUT_NEWLINE;
+    out << pvk.one_g1 << OUTPUT_NEWLINE;
+    out << pvk.one_m_g2_precomp << OUTPUT_NEWLINE;
+    out << pvk.delta << OUTPUT_NEWLINE;
+    out << pvk.epsilon << OUTPUT_NEWLINE;
+    out << pvk.eta << OUTPUT_NEWLINE;
+    out << pvk.kappa << OUTPUT_NEWLINE;
+    libff::operator<<(out, pvk.mac_keys) << OUTPUT_NEWLINE;
     return out;
 }
 
 template<typename ppT>
-std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_processed_verification_key<ppT> &pvk)
+std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_dv_processed_verification_key<ppT> &pvk)
 {
     in >> pvk.Pi_statement;
     libff::consume_OUTPUT_NEWLINE(in);
     in >> pvk.alpha_g1_beta_g2;
     libff::consume_OUTPUT_NEWLINE(in);
-    in >> pvk.gamma_m_g2_precomp;
+    in >> pvk.one_g1;
     libff::consume_OUTPUT_NEWLINE(in);
-    in >> pvk.delta_g2_precomp;
+    in >> pvk.one_m_g2_precomp;
     libff::consume_OUTPUT_NEWLINE(in);
-    in >> pvk.epsilon_g2_precomp;
+    in >> pvk.delta;
     libff::consume_OUTPUT_NEWLINE(in);
-    in >> pvk.eta_g2_precomp;
+    in >> pvk.epsilon;
     libff::consume_OUTPUT_NEWLINE(in);
-    in >> pvk.kappa_g2_precomp;
+    in >> pvk.eta;
     libff::consume_OUTPUT_NEWLINE(in);
-    libff::operator>>(in, pvk.pubkeys);
+    in >> pvk.kappa;
+    libff::consume_OUTPUT_NEWLINE(in);
+    libff::operator>>(in, pvk.mac_keys);
     libff::consume_OUTPUT_NEWLINE(in);
     return in;
 }
 
 template<typename ppT>
-bool r1cs_gg_ppzkadscsnark_authentication_key<ppT>::operator==(const r1cs_gg_ppzkadscsnark_authentication_key<ppT> &other) const
+bool r1cs_gg_ppzkadscsnark_dv_authentication_key<ppT>::operator==(const r1cs_gg_ppzkadscsnark_dv_authentication_key<ppT> &other) const
 {
-    return (this->privkey == other.privkey &&
+    return (this->mac_key == other.mac_key &&
     this->T_g1 == other.T_g1 &&
     this->delta_g1 == other.delta_g1);
 }
 
 template<typename ppT>
-std::ostream& operator<<(std::ostream &out, const r1cs_gg_ppzkadscsnark_authentication_key<ppT> &ak)
+std::ostream& operator<<(std::ostream &out, const r1cs_gg_ppzkadscsnark_dv_authentication_key<ppT> &ak)
 {
-    out << ak.privkey << OUTPUT_NEWLINE;
+    out << ak.mac_key << OUTPUT_NEWLINE;
     out << ak.T_g1 << OUTPUT_NEWLINE;
     out << ak.delta_g1 << OUTPUT_NEWLINE;
     return out;
 }
 
 template<typename ppT>
-std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_authentication_key<ppT> &ak)
+std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_dv_authentication_key<ppT> &ak)
 {
-    in >> ak.privkey;
+    in >> ak.mac_key;
     libff::consume_OUTPUT_NEWLINE(in);
     in >> ak.T_g1;
     libff::consume_OUTPUT_NEWLINE(in);
@@ -352,26 +314,26 @@ std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_authentication_
 }
 
 template<typename ppT>
-bool r1cs_gg_ppzkadscsnark_authenticated_input<ppT>::operator==(const r1cs_gg_ppzkadscsnark_authenticated_input<ppT> &other) const
+bool r1cs_gg_ppzkadscsnark_dv_authenticated_input<ppT>::operator==(const r1cs_gg_ppzkadscsnark_dv_authenticated_input<ppT> &other) const
 {
     return (this->values == other.values &&
             this->D_g1 == other.D_g1 &&
             this->bD == other.bD &&
-            this->signature == other.signature);
+            this->mac == other.mac);
 }
 
 template<typename ppT>
-std::ostream& operator<<(std::ostream &out, const r1cs_gg_ppzkadscsnark_authenticated_input<ppT> &ai)
+std::ostream& operator<<(std::ostream &out, const r1cs_gg_ppzkadscsnark_dv_authenticated_input<ppT> &ai)
 {
     out << ai.values << OUTPUT_NEWLINE;
     out << ai.D_g1 << OUTPUT_NEWLINE;
     out << ai.bD << OUTPUT_NEWLINE;
-    out << ai.signature << OUTPUT_NEWLINE;
+    out << ai.mac << OUTPUT_NEWLINE;
     return out;
 }
 
 template<typename ppT>
-std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_authenticated_input<ppT> &ai)
+std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_dv_authenticated_input<ppT> &ai)
 {
     in >> ai.values;
     libff::consume_OUTPUT_NEWLINE(in);
@@ -379,34 +341,34 @@ std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_authenticated_i
     libff::consume_OUTPUT_NEWLINE(in);
     in >> ai.bD;
     libff::consume_OUTPUT_NEWLINE(in);
-    in >> ai.signature;
+    in >> ai.mac;
     libff::consume_OUTPUT_NEWLINE(in);
     return in;
 }
 
 template<typename ppT>
-bool r1cs_gg_ppzkadscsnark_proof<ppT>::operator==(const r1cs_gg_ppzkadscsnark_proof<ppT> &other) const
+bool r1cs_gg_ppzkadscsnark_dv_proof<ppT>::operator==(const r1cs_gg_ppzkadscsnark_dv_proof<ppT> &other) const
 {
     return (this->A_g1 == other.A_g1 &&
             this->C_g1 == other.C_g1 &&
             this->D_g1_vec == other.D_g1_vec &&
             this->B_g2 == other.B_g2 &&
-            this->signatures == other.signatures);
+            this->macs == other.macs);
 }
 
 template<typename ppT>
-std::ostream& operator<<(std::ostream &out, const r1cs_gg_ppzkadscsnark_proof<ppT> &proof)
+std::ostream& operator<<(std::ostream &out, const r1cs_gg_ppzkadscsnark_dv_proof<ppT> &proof)
 {
     out << proof.A_g1 << OUTPUT_NEWLINE;
     out << proof.C_g1 << OUTPUT_NEWLINE;
     out << proof.D_g1_vec << OUTPUT_NEWLINE;
     out << proof.B_g2 << OUTPUT_NEWLINE;
-    libff::operator<<(out, proof.signatures) << OUTPUT_NEWLINE;
+    libff::operator<<(out, proof.macs) << OUTPUT_NEWLINE;
     return out;
 }
 
 template<typename ppT>
-std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_proof<ppT> &proof)
+std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_dv_proof<ppT> &proof)
 {
     in >> proof.A_g1;
     libff::consume_OUTPUT_NEWLINE(in);
@@ -416,37 +378,39 @@ std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_proof<ppT> &pro
     libff::consume_OUTPUT_NEWLINE(in);
     in >> proof.B_g2;
     libff::consume_OUTPUT_NEWLINE(in);
-    libff::operator>>(in, proof.signatures);
+    libff::operator>>(in, proof.macs);
     libff::consume_OUTPUT_NEWLINE(in);
     return in;
 }
 
 template<typename ppT>
-bool r1cs_gg_ppzkadscsnark_commitment<ppT>::operator==(const r1cs_gg_ppzkadscsnark_commitment<ppT> &other) const
+bool r1cs_gg_ppzkadscsnark_dv_commitment<ppT>::operator==(const r1cs_gg_ppzkadscsnark_dv_commitment<ppT> &other) const
 {
     return this->E_g1 == other.E_g1;
 }
 
 template<typename ppT>
-std::ostream& operator<<(std::ostream &out, const r1cs_gg_ppzkadscsnark_commitment<ppT> &c)
+std::ostream& operator<<(std::ostream &out, const r1cs_gg_ppzkadscsnark_dv_commitment<ppT> &c)
 {
     out << c.E_g1;
     return out;
 }
 
 template<typename ppT>
-std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_commitment<ppT> &c)
+std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_dv_commitment<ppT> &c)
 {
     in >> c.E_g1;
     return in;
 }
 
+
+
 template <typename ppT>
-r1cs_gg_ppzkadscsnark_keypair<ppT> r1cs_gg_ppzkadscsnark_generator(const r1cs_gg_ppzkadscsnark_constraint_system<ppT> &r1cs,
-                                                               const r1cs_gg_ppzkadscsnark_assignment<ppT> &initial_state,
+r1cs_gg_ppzkadscsnark_dv_keypair<ppT> r1cs_gg_ppzkadscsnark_dv_generator(const r1cs_gg_ppzkadscsnark_dv_constraint_system<ppT> &r1cs,
+                                                               const r1cs_gg_ppzkadscsnark_dv_assignment<ppT> &initial_state,
                                                                std::vector<size_t> private_input_blocks)
 {
-    libff::enter_block("Call to r1cs_gg_ppzkadscsnark_generator");
+    libff::enter_block("Call to r1cs_gg_ppzkadscsnark_dv_generator");
     assert(initial_state.size() == r1cs.state_size);
 
     // Default case, just one authentication key for entire private-input-block
@@ -473,12 +437,11 @@ r1cs_gg_ppzkadscsnark_keypair<ppT> r1cs_gg_ppzkadscsnark_generator(const r1cs_gg
     const libff::Fr<ppT> t = libff::Fr<ppT>::random_element();
     const libff::Fr<ppT> alpha = libff::Fr<ppT>::random_element();
     const libff::Fr<ppT> beta = libff::Fr<ppT>::random_element();
-    const libff::Fr<ppT> gamma = libff::Fr<ppT>::random_element();
     const libff::Fr<ppT> delta = libff::Fr<ppT>::random_element();
     const libff::Fr<ppT> kappa = libff::Fr<ppT>::random_element();
     const libff::Fr<ppT> eta = libff::Fr<ppT>::random_element();
     const libff::Fr<ppT> epsilon = libff::Fr<ppT>::random_element();
-    const libff::Fr<ppT> gamma_inverse = gamma.inverse();
+
     const libff::Fr<ppT> delta_inverse = delta.inverse();
 
     libff::Fr_vector<ppT> Ti;
@@ -496,15 +459,13 @@ r1cs_gg_ppzkadscsnark_keypair<ppT> r1cs_gg_ppzkadscsnark_generator(const r1cs_gg
     }
 
     libff::enter_block("Generate signing keys");
-    std::vector<r1cs_gg_ppzkadscsnark_signature_pubkey<ppT>> pubkeys;
-    std::vector<r1cs_gg_ppzkadscsnark_signature_privkey<ppT>> privkeys;
+    std::vector<r1cs_gg_ppzkadscsnark_dv_mac_key<ppT>> mac_keys;
 
     for (size_t i = 0; i < private_input_blocks.size(); ++i)
     {
-        r1cs_gg_ppzkadscsnark_signature_keypair<ppT> keypair;
-        keypair = r1cs_gg_ppzkadscsnark_signature_generate<ppT>();
-        pubkeys.push_back(keypair.pubkey);
-        privkeys.push_back(keypair.privkey);
+        r1cs_gg_ppzkadscsnark_dv_mac_key<ppT> key;
+        key = r1cs_gg_ppzkadscsnark_dv_mac_generate<ppT>();
+        mac_keys.push_back(key);
     }
     libff::leave_block("Generate signing keys");
 
@@ -550,12 +511,11 @@ r1cs_gg_ppzkadscsnark_keypair<ppT> r1cs_gg_ppzkadscsnark_generator(const r1cs_gg
     /* The gamma inverse product component: (beta*A_i(t) + alpha*B_i(t) + C_i(t)) * gamma^{-1}. */
     libff::enter_block("Compute Pi_statement_t for R1CS verification key");
     libff::Fr_vector<ppT> Pi_statement_t;
-    Pi_statement_t.reserve(qap.num_inputs());
+    Pi_statement_t.reserve(qap.num_inputs() + 1);
 
-    const libff::Fr<ppT> Pi_statement_0_t = (beta * At[0] + alpha * Bt[0] + Ct[0]) * gamma_inverse;
-    for (size_t i = 1; i < qap.num_inputs() + 1; ++i)
+    for (size_t i = 0; i < qap.num_inputs() + 1; ++i)
     {
-        Pi_statement_t.emplace_back((beta * At[i] + alpha * Bt[i] + Ct[i]) * gamma_inverse);
+        Pi_statement_t.emplace_back(beta * At[i] + alpha * Bt[i] + Ct[i]);
     }
     libff::leave_block("Compute Pi_statement_t for R1CS verification key");
 
@@ -731,14 +691,8 @@ r1cs_gg_ppzkadscsnark_keypair<ppT> r1cs_gg_ppzkadscsnark_generator(const r1cs_gg
 
     libff::enter_block("Generate R1CS verification key");
     libff::GT<ppT> alpha_g1_beta_g2 = ppT::reduced_pairing(alpha_g1, beta_g2);
-    libff::G2<ppT> gamma_g2 = gamma * G2_gen;
-    libff::G2<ppT> epsilon_g2 = epsilon * G2_gen;
-    libff::G2<ppT> eta_g2 = eta * G2_gen;
-    libff::G2<ppT> kappa_g2 = kappa * G2_gen;
-    libff::enter_block("Encode Pi_statement for R1CS verification key");
-    libff::G1<ppT> Pi_statement_g1_0 = Pi_statement_0_t * g1_generator;
-    libff::G1_vector<ppT> Pi_statement_g1_values = batch_exp(g1_scalar_size, g1_window_size, g1_table, Pi_statement_t);
-    libff::leave_block("Encode Pi_statement for R1CS verification key");
+    libff::G2<ppT> one_m_g2 = -G2_gen;
+    libff::G1<ppT> one_g1 = g1_generator;
     libff::leave_block("Generate R1CS verification key");
 
     libff::enter_block("Generate initial commitment");
@@ -754,32 +708,31 @@ r1cs_gg_ppzkadscsnark_keypair<ppT> r1cs_gg_ppzkadscsnark_generator(const r1cs_gg
     libff::leave_block("Generate initial commitment");
 
 
-    libff::leave_block("Call to r1cs_gg_ppzkadscsnark_generator");
+    libff::leave_block("Call to r1cs_gg_ppzkadscsnark_dv_generator");
 
-    accumulation_vector<libff::G1<ppT> > Pi_statement_g1(std::move(Pi_statement_g1_0), std::move(Pi_statement_g1_values));
-
-    std::vector<r1cs_gg_ppzkadscsnark_authentication_key<ppT>> aks;
+    std::vector<r1cs_gg_ppzkadscsnark_dv_authentication_key<ppT>> aks;
     for(size_t i = 0; i < private_input_blocks.size(); ++i){
         size_t num_inputs = private_input_blocks[i];
         libff::G1_vector<ppT> T_part(Ti_g1.begin(), Ti_g1.begin() + num_inputs);
         Ti_g1.erase(Ti_g1.begin(), Ti_g1.begin() + num_inputs);
-        r1cs_gg_ppzkadscsnark_authentication_key<ppT> ak = r1cs_gg_ppzkadscsnark_authentication_key<ppT>(
-            privkeys[i], T_part, delta_g1);
+        r1cs_gg_ppzkadscsnark_dv_authentication_key<ppT> ak = r1cs_gg_ppzkadscsnark_dv_authentication_key<ppT>(
+            mac_keys[i], T_part, delta_g1);
         ak.print_size();
         aks.push_back(ak);
     }
 
-    r1cs_gg_ppzkadscsnark_verification_key<ppT> vk = r1cs_gg_ppzkadscsnark_verification_key<ppT>(
-                                                                                std::move(gamma_g2),
-                                                                                std::move(delta_g2),
-                                                                                std::move(epsilon_g2),
-                                                                                std::move(eta_g2),
-                                                                                std::move(kappa_g2),
-                                                                                std::move(Pi_statement_g1),
+    r1cs_gg_ppzkadscsnark_dv_verification_key<ppT> vk = r1cs_gg_ppzkadscsnark_dv_verification_key<ppT>(
+                                                                                std::move(one_g1),
+                                                                                std::move(one_m_g2),
+                                                                                delta,
+                                                                                epsilon,
+                                                                                eta,
+                                                                                kappa,
+                                                                                std::move(Pi_statement_t),
                                                                                 std::move(alpha_g1_beta_g2),
-                                                                                std::move(pubkeys));
+                                                                                std::move(mac_keys));
 
-    r1cs_gg_ppzkadscsnark_proving_key<ppT> pk = r1cs_gg_ppzkadscsnark_proving_key<ppT>(std::move(alpha_g1),
+    r1cs_gg_ppzkadscsnark_dv_proving_key<ppT> pk = r1cs_gg_ppzkadscsnark_dv_proving_key<ppT>(std::move(alpha_g1),
                                                                                std::move(beta_g1),
                                                                                std::move(delta_g1),
                                                                                std::move(epsilon_g1),
@@ -798,17 +751,17 @@ r1cs_gg_ppzkadscsnark_keypair<ppT> r1cs_gg_ppzkadscsnark_generator(const r1cs_gg
                                                                                );
 
 
-    r1cs_gg_ppzkadscsnark_commitment<ppT> initial_commitment(std::move(evaluation_commitment));
+    r1cs_gg_ppzkadscsnark_dv_commitment<ppT> initial_commitment(std::move(evaluation_commitment));
 
 
     pk.print_size();
     vk.print_size();
 
-    return r1cs_gg_ppzkadscsnark_keypair<ppT>(std::move(pk), std::move(vk), std::move(aks), std::move(initial_commitment));
+    return r1cs_gg_ppzkadscsnark_dv_keypair<ppT>(std::move(pk), std::move(vk), std::move(aks), std::move(initial_commitment));
 }
 
 template<typename ppT>
-r1cs_gg_ppzkadscsnark_authenticated_input<ppT> r1cs_gg_ppzkadscsnark_authenticate(const r1cs_gg_ppzkadscsnark_authentication_key<ppT> &ak, const r1cs_gg_ppzkadscsnark_label<ppT> &label, const r1cs_gg_ppzkadscsnark_assignment<ppT> &input)
+r1cs_gg_ppzkadscsnark_dv_authenticated_input<ppT> r1cs_gg_ppzkadscsnark_dv_authenticate(const r1cs_gg_ppzkadscsnark_dv_authentication_key<ppT> &ak, const r1cs_gg_ppzkadscsnark_dv_label<ppT> &label, const r1cs_gg_ppzkadscsnark_dv_assignment<ppT> &input)
 {
     assert(input.size() == ak.T_g1.size());
 
@@ -820,9 +773,8 @@ r1cs_gg_ppzkadscsnark_authenticated_input<ppT> r1cs_gg_ppzkadscsnark_authenticat
 
     // Pick randomisation value
     const libff::Fr<ppT> bD = libff::Fr<ppT>::random_element();
-    //const libff::Fr<ppT> bD = libff::Fr<ppT>::zero();
 
-    r1cs_gg_ppzkadscsnark_authenticated_input<ppT> ai;
+    r1cs_gg_ppzkadscsnark_dv_authenticated_input<ppT> ai;
     ai.values = input;
 
     ai.D_g1 = libff::multi_exp_with_mixed_addition<libff::G1<ppT>,
@@ -836,25 +788,25 @@ r1cs_gg_ppzkadscsnark_authenticated_input<ppT> r1cs_gg_ppzkadscsnark_authenticat
 
     ai.bD = bD;
 
-    ai.signature = r1cs_gg_ppzkadscsnark_signature_sign<ppT>(ak.privkey, ai.D_g1, label);
+    ai.mac = r1cs_gg_ppzkadscsnark_dv_mac_compute<ppT>(ak.mac_key, ai.D_g1, label);
     return ai;
 }
 
 
 template <typename ppT>
-std::pair<r1cs_gg_ppzkadscsnark_proof<ppT>, r1cs_gg_ppzkadscsnark_commitment<ppT>> r1cs_gg_ppzkadscsnark_prover(
-                              const r1cs_gg_ppzkadscsnark_proving_key<ppT> &pk,
-                              const r1cs_gg_ppzkadscsnark_constraint_system<ppT> &constraint_system,
-                              const r1cs_gg_ppzkadscsnark_primary_input<ppT> &primary_input,
-                              const std::vector<r1cs_gg_ppzkadscsnark_authenticated_input<ppT>> &authenticated_inputs,
-                              const r1cs_gg_ppzkadscsnark_assignment<ppT> &state_input,
-                              const r1cs_gg_ppzkadscsnark_assignment<ppT> &state_update_input,
-                              const r1cs_gg_ppzkadscsnark_assignment<ppT> &witness_input,
-                              r1cs_gg_ppzkadscsnark_prover_state<ppT> &prover_state)
+std::pair<r1cs_gg_ppzkadscsnark_dv_proof<ppT>, r1cs_gg_ppzkadscsnark_dv_commitment<ppT>> r1cs_gg_ppzkadscsnark_dv_prover(
+                              const r1cs_gg_ppzkadscsnark_dv_proving_key<ppT> &pk,
+                              const r1cs_gg_ppzkadscsnark_dv_constraint_system<ppT> &constraint_system,
+                              const r1cs_gg_ppzkadscsnark_dv_primary_input<ppT> &primary_input,
+                              const std::vector<r1cs_gg_ppzkadscsnark_dv_authenticated_input<ppT>> &authenticated_inputs,
+                              const r1cs_gg_ppzkadscsnark_dv_assignment<ppT> &state_input,
+                              const r1cs_gg_ppzkadscsnark_dv_assignment<ppT> &state_update_input,
+                              const r1cs_gg_ppzkadscsnark_dv_assignment<ppT> &witness_input,
+                              r1cs_gg_ppzkadscsnark_dv_prover_state<ppT> &prover_state)
 {
-    libff::enter_block("Call to r1cs_gg_ppzkadscsnark_prover");
+    libff::enter_block("Call to r1cs_gg_ppzkadscsnark_dv_prover");
 
-    r1cs_gg_ppzkadscsnark_auxiliary_input<ppT> auxiliary_input;
+    r1cs_gg_ppzkadscsnark_dv_auxiliary_input<ppT> auxiliary_input;
     auxiliary_input.reserve(constraint_system.private_input_size + state_input.size() + state_update_input.size() + witness_input.size());
     for (auto &ai: authenticated_inputs)
     {
@@ -1029,65 +981,71 @@ std::pair<r1cs_gg_ppzkadscsnark_proof<ppT>, r1cs_gg_ppzkadscsnark_commitment<ppT
     prover_state.bE = bE;
 
     /* Collect authenticated commitments */
-    std::vector<r1cs_gg_ppzkadscsnark_signature_signature<ppT>> signatures;
+    std::vector<r1cs_gg_ppzkadscsnark_dv_mac<ppT>> macs;
     libff::G1_vector<ppT> D_g1_vec;
     for (auto &ai: authenticated_inputs)
     {
-        signatures.push_back(ai.signature);
+        macs.push_back(ai.mac);
         D_g1_vec.push_back(ai.D_g1);
     }
 
 
-    libff::leave_block("Call to r1cs_gg_ppzkadscsnark_prover");
+    libff::leave_block("Call to r1cs_gg_ppzkadscsnark_dv_prover");
 
-    r1cs_gg_ppzkadscsnark_proof<ppT> proof = r1cs_gg_ppzkadscsnark_proof<ppT>(std::move(A_g1),
+    r1cs_gg_ppzkadscsnark_dv_proof<ppT> proof = r1cs_gg_ppzkadscsnark_dv_proof<ppT>(std::move(A_g1),
                                                                       std::move(C_g1),
                                                                       std::move(D_g1_vec),
                                                                       std::move(B_g2),
-                                                                      std::move(signatures));
+                                                                      std::move(macs));
     proof.print_size();
 
-    r1cs_gg_ppzkadscsnark_commitment<ppT> commitment = r1cs_gg_ppzkadscsnark_commitment<ppT>(std::move(E_g1));
+    r1cs_gg_ppzkadscsnark_dv_commitment<ppT> commitment = r1cs_gg_ppzkadscsnark_dv_commitment<ppT>(std::move(E_g1));
     commitment.print_size();
 
-    return std::pair<r1cs_gg_ppzkadscsnark_proof<ppT>, r1cs_gg_ppzkadscsnark_commitment<ppT>>(proof, commitment);
+    return std::pair<r1cs_gg_ppzkadscsnark_dv_proof<ppT>, r1cs_gg_ppzkadscsnark_dv_commitment<ppT>>(proof, commitment);
 }
 
 template <typename ppT>
-r1cs_gg_ppzkadscsnark_processed_verification_key<ppT> r1cs_gg_ppzkadscsnark_verifier_process_vk(const r1cs_gg_ppzkadscsnark_verification_key<ppT> &vk)
+r1cs_gg_ppzkadscsnark_dv_processed_verification_key<ppT> r1cs_gg_ppzkadscsnark_dv_verifier_process_vk(const r1cs_gg_ppzkadscsnark_dv_verification_key<ppT> &vk)
 {
-    libff::enter_block("Call to r1cs_gg_ppzkadscsnark_verifier_process_vk");
+    libff::enter_block("Call to r1cs_gg_ppzkadscsnark_dv_verifier_process_vk");
 
-    r1cs_gg_ppzkadscsnark_processed_verification_key<ppT> pvk;
+    r1cs_gg_ppzkadscsnark_dv_processed_verification_key<ppT> pvk;
 
-    pvk.gamma_m_g2_precomp = ppT::precompute_G2(-vk.gamma_g2);
-    pvk.delta_g2_precomp = ppT::precompute_G2(vk.delta_g2);
-    pvk.epsilon_g2_precomp = ppT::precompute_G2(vk.epsilon_g2);
-    pvk.eta_g2_precomp = ppT::precompute_G2(vk.eta_g2);
-    pvk.kappa_g2_precomp = ppT::precompute_G2(vk.kappa_g2);
+    pvk.one_g1 = vk.one_g1;
+    pvk.one_m_g2_precomp = ppT::precompute_G2(vk.one_m_g2);
+
+    pvk.delta = vk.delta;
+    pvk.epsilon = vk.epsilon;
+    pvk.eta = vk.eta;
+    pvk.kappa = vk.kappa;
 
     pvk.Pi_statement = vk.Pi_statement;
     pvk.alpha_g1_beta_g2 = vk.alpha_g1_beta_g2;
-    pvk.pubkeys = vk.pubkeys;
+    pvk.mac_keys = vk.mac_keys;
 
-    libff::leave_block("Call to r1cs_gg_ppzkadscsnark_verifier_process_vk");
+    libff::leave_block("Call to r1cs_gg_ppzkadscsnark_dv_verifier_process_vk");
     return pvk;
 }
 
 template <typename ppT>
-bool r1cs_gg_ppzkadscsnark_online_verifier_weak_IC(const r1cs_gg_ppzkadscsnark_processed_verification_key<ppT> &pvk,
-                                               const r1cs_gg_ppzkadscsnark_primary_input<ppT> &input,
-                                               const r1cs_gg_ppzkadscsnark_proof<ppT> &proof,
-                                               const r1cs_gg_ppzkadscsnark_commitment<ppT> &commitment,
-                                               const r1cs_gg_ppzkadscsnark_commitment<ppT> &commitment_previous,
-                                               const r1cs_gg_ppzkadscsnark_label<ppT> &iteration)
+bool r1cs_gg_ppzkadscsnark_dv_online_verifier_weak_IC(const r1cs_gg_ppzkadscsnark_dv_processed_verification_key<ppT> &pvk,
+                                               const r1cs_gg_ppzkadscsnark_dv_primary_input<ppT> &input,
+                                               const r1cs_gg_ppzkadscsnark_dv_proof<ppT> &proof,
+                                               const r1cs_gg_ppzkadscsnark_dv_commitment<ppT> &commitment,
+                                               const r1cs_gg_ppzkadscsnark_dv_commitment<ppT> &commitment_previous,
+                                               const r1cs_gg_ppzkadscsnark_dv_label<ppT> &iteration)
 {
-    libff::enter_block("Call to r1cs_gg_ppzkadscsnark_online_verifier_weak_IC");
-    assert(pvk.Pi_statement.domain_size() >= input.size());
+    libff::enter_block("Call to r1cs_gg_ppzkadscsnark_dv_online_verifier_weak_IC");
+    assert(pvk.Pi_statement.size() >= input.size() + 1);
 
     libff::enter_block("Accumulate input");
-    const accumulation_vector<libff::G1<ppT> > accumulated_IC = pvk.Pi_statement.template accumulate_chunk<libff::Fr<ppT> >(input.begin(), input.end(), 0);
-    const libff::G1<ppT> &acc = accumulated_IC.first;
+    libff::Fr<ppT> accumulated_input = pvk.Pi_statement[0]; // factor is one, first input is always the "constant"
+    for (size_t i = 1; i < pvk.Pi_statement.size() && i - 1 < input.size(); ++i)
+    {
+    	accumulated_input += pvk.Pi_statement[i]*input[i-1];
+    }
+    const libff::G1<ppT> acc = accumulated_input * pvk.one_g1;
     libff::leave_block("Accumulate input");
 
     bool result = true;
@@ -1107,7 +1065,7 @@ bool r1cs_gg_ppzkadscsnark_online_verifier_weak_IC(const r1cs_gg_ppzkadscsnark_p
 
     libff::enter_block("Check authenticated commitments");
     libff::G1<ppT> D_acc = libff::G1<ppT>::zero();
-    if (pvk.pubkeys.size() != proof.D_g1_vec.size() || pvk.pubkeys.size() != proof.signatures.size())
+    if (pvk.mac_keys.size() != proof.D_g1_vec.size() || pvk.mac_keys.size() != proof.macs.size())
     {
         if (!libff::inhibit_profiling_info)
         {
@@ -1115,11 +1073,11 @@ bool r1cs_gg_ppzkadscsnark_online_verifier_weak_IC(const r1cs_gg_ppzkadscsnark_p
         }
         result = false;
     }
-    for (size_t i = 0; i < pvk.pubkeys.size(); ++i)
+    for (size_t i = 0; i < pvk.mac_keys.size(); ++i)
     {
         libff::G1<ppT> D_g1 = proof.D_g1_vec[i];
 
-        if (r1cs_gg_ppzkadscsnark_signature_verify<ppT>(pvk.pubkeys[i], proof.signatures[i], D_g1, iteration))
+        if (r1cs_gg_ppzkadscsnark_dv_mac_verify<ppT>(pvk.mac_keys[i], proof.macs[i], D_g1, iteration))
         {
             D_acc = D_acc + D_g1;
         }
@@ -1127,7 +1085,7 @@ bool r1cs_gg_ppzkadscsnark_online_verifier_weak_IC(const r1cs_gg_ppzkadscsnark_p
         {
             if (!libff::inhibit_profiling_info)
             {
-                libff::print_indent(); printf("Input signature %ud incorrect.\n", (unsigned int) i);
+                libff::print_indent(); printf("Input mac %ud incorrect.\n", (unsigned int) i);
             }
             result = false;
         }
@@ -1136,27 +1094,14 @@ bool r1cs_gg_ppzkadscsnark_online_verifier_weak_IC(const r1cs_gg_ppzkadscsnark_p
 
     libff::enter_block("Online pairing computations");
     libff::enter_block("Check QAP divisibility");
+    const libff::G1<ppT> icdee = acc + pvk.delta*proof.C_g1 + pvk.epsilon*D_acc + pvk.eta*commitment_previous.E_g1 + pvk.kappa*commitment.E_g1;
     const libff::G1_precomp<ppT> proof_g_A_precomp = ppT::precompute_G1(proof.A_g1);
     const libff::G2_precomp<ppT> proof_g_B_precomp = ppT::precompute_G2(proof.B_g2);
-    const libff::G1_precomp<ppT> acc_precomp = ppT::precompute_G1(acc);
-    const libff::G1_precomp<ppT> proof_g_C_precomp = ppT::precompute_G1(proof.C_g1);
-    const libff::G1_precomp<ppT> proof_g_D_precomp = ppT::precompute_G1(D_acc);
-    const libff::G1_precomp<ppT> proof_g_Et_precomp = ppT::precompute_G1(commitment.E_g1);
-    const libff::G1_precomp<ppT> proof_g_Etm1_precomp = ppT::precompute_G1(commitment_previous.E_g1);
+    const libff::G1_precomp<ppT> icdee_precomp = ppT::precompute_G1(icdee);
 
-    // A*B - Pi_statement/gamma * gamma
     const libff::Fqk<ppT> QAP1 = ppT::double_miller_loop(proof_g_A_precomp,  proof_g_B_precomp,
-                                                         acc_precomp,  pvk.gamma_m_g2_precomp);
-    // C*delta + D*epsilon
-    const libff::Fqk<ppT> QAP2 = ppT::double_miller_loop(proof_g_C_precomp,  pvk.delta_g2_precomp,
-                                                     proof_g_D_precomp,  pvk.epsilon_g2_precomp);
-    // E_(t-1)*eta + E_(t)*kappa
-    const libff::Fqk<ppT> QAP3 = ppT::double_miller_loop(proof_g_Etm1_precomp,  pvk.eta_g2_precomp,
-                                                     proof_g_Et_precomp,  pvk.kappa_g2_precomp);
-
-    // A*B - Pi_statement/gamma * gamma - C*delta - D*epsilon - E_(t-1)*eta - E_(t)*kappa
-    const libff::Fqk<ppT> QAP_total = QAP1*((QAP2*QAP3).unitary_inverse());
-    const libff::GT<ppT> QAP = ppT::final_exponentiation(QAP_total);
+                                                         icdee_precomp,  pvk.one_m_g2_precomp);
+    const libff::GT<ppT> QAP = ppT::final_exponentiation(QAP1);
 
     if (QAP != pvk.alpha_g1_beta_g2)
     {
@@ -1169,68 +1114,68 @@ bool r1cs_gg_ppzkadscsnark_online_verifier_weak_IC(const r1cs_gg_ppzkadscsnark_p
     libff::leave_block("Check QAP divisibility");
     libff::leave_block("Online pairing computations");
 
-    libff::leave_block("Call to r1cs_gg_ppzkadscsnark_online_verifier_weak_IC");
+    libff::leave_block("Call to r1cs_gg_ppzkadscsnark_dv_online_verifier_weak_IC");
 
     return result;
 }
 
 template<typename ppT>
-bool r1cs_gg_ppzkadscsnark_verifier_weak_IC(const r1cs_gg_ppzkadscsnark_verification_key<ppT> &vk,
-                                        const r1cs_gg_ppzkadscsnark_primary_input<ppT> &primary_input,
-                                        const r1cs_gg_ppzkadscsnark_proof<ppT> &proof,
-                                        const r1cs_gg_ppzkadscsnark_commitment<ppT> &commitment,
-                                        const r1cs_gg_ppzkadscsnark_commitment<ppT> &commitment_previous,
-                                        const r1cs_gg_ppzkadscsnark_label<ppT> &iteration)
+bool r1cs_gg_ppzkadscsnark_dv_verifier_weak_IC(const r1cs_gg_ppzkadscsnark_dv_verification_key<ppT> &vk,
+                                        const r1cs_gg_ppzkadscsnark_dv_primary_input<ppT> &primary_input,
+                                        const r1cs_gg_ppzkadscsnark_dv_proof<ppT> &proof,
+                                        const r1cs_gg_ppzkadscsnark_dv_commitment<ppT> &commitment,
+                                        const r1cs_gg_ppzkadscsnark_dv_commitment<ppT> &commitment_previous,
+                                        const r1cs_gg_ppzkadscsnark_dv_label<ppT> &iteration)
 {
-    libff::enter_block("Call to r1cs_gg_ppzkadscsnark_verifier_weak_IC");
-    r1cs_gg_ppzkadscsnark_processed_verification_key<ppT> pvk = r1cs_gg_ppzkadscsnark_verifier_process_vk<ppT>(vk);
-    bool result = r1cs_gg_ppzkadscsnark_online_verifier_weak_IC<ppT>(pvk, primary_input, proof, commitment, commitment_previous, iteration);
-    libff::leave_block("Call to r1cs_gg_ppzkadscsnark_verifier_weak_IC");
+    libff::enter_block("Call to r1cs_gg_ppzkadscsnark_dv_verifier_weak_IC");
+    r1cs_gg_ppzkadscsnark_dv_processed_verification_key<ppT> pvk = r1cs_gg_ppzkadscsnark_dv_verifier_process_vk<ppT>(vk);
+    bool result = r1cs_gg_ppzkadscsnark_dv_online_verifier_weak_IC<ppT>(pvk, primary_input, proof, commitment, commitment_previous, iteration);
+    libff::leave_block("Call to r1cs_gg_ppzkadscsnark_dv_verifier_weak_IC");
     return result;
 }
 
 template<typename ppT>
-bool r1cs_gg_ppzkadscsnark_online_verifier_strong_IC(const r1cs_gg_ppzkadscsnark_processed_verification_key<ppT> &pvk,
-                                                 const r1cs_gg_ppzkadscsnark_primary_input<ppT> &primary_input,
-                                                 const r1cs_gg_ppzkadscsnark_proof<ppT> &proof,
-                                                 const r1cs_gg_ppzkadscsnark_commitment<ppT> &commitment,
-                                                 const r1cs_gg_ppzkadscsnark_commitment<ppT> &commitment_previous,
-                                                 const r1cs_gg_ppzkadscsnark_label<ppT> &iteration)
+bool r1cs_gg_ppzkadscsnark_dv_online_verifier_strong_IC(const r1cs_gg_ppzkadscsnark_dv_processed_verification_key<ppT> &pvk,
+                                                 const r1cs_gg_ppzkadscsnark_dv_primary_input<ppT> &primary_input,
+                                                 const r1cs_gg_ppzkadscsnark_dv_proof<ppT> &proof,
+                                                 const r1cs_gg_ppzkadscsnark_dv_commitment<ppT> &commitment,
+                                                 const r1cs_gg_ppzkadscsnark_dv_commitment<ppT> &commitment_previous,
+                                                 const r1cs_gg_ppzkadscsnark_dv_label<ppT> &iteration)
 {
     bool result = true;
-    libff::enter_block("Call to r1cs_gg_ppzkadscsnark_online_verifier_strong_IC");
+    libff::enter_block("Call to r1cs_gg_ppzkadscsnark_dv_online_verifier_strong_IC");
 
-    if (pvk.Pi_statement.domain_size() != primary_input.size())
+    if (pvk.Pi_statement.size() != primary_input.size() + 1)
     {
         libff::print_indent(); printf("Input length differs from expected (got %zu, expected %zu).\n", primary_input.size(), pvk.Pi_statement.size()-1);
         result = false;
     }
     else
     {
-        result = r1cs_gg_ppzkadscsnark_online_verifier_weak_IC(pvk, primary_input, proof,
+        result = r1cs_gg_ppzkadscsnark_dv_online_verifier_weak_IC(pvk, primary_input, proof,
                                                     commitment, commitment_previous, iteration);
     }
 
-    libff::leave_block("Call to r1cs_gg_ppzkadscsnark_online_verifier_strong_IC");
+    libff::leave_block("Call to r1cs_gg_ppzkadscsnark_dv_online_verifier_strong_IC");
     return result;
 }
 
 template<typename ppT>
-bool r1cs_gg_ppzkadscsnark_verifier_strong_IC(const r1cs_gg_ppzkadscsnark_verification_key<ppT> &vk,
-                                        const r1cs_gg_ppzkadscsnark_primary_input<ppT> &primary_input,
-                                        const r1cs_gg_ppzkadscsnark_proof<ppT> &proof,
-                                        const r1cs_gg_ppzkadscsnark_commitment<ppT> &commitment,
-                                        const r1cs_gg_ppzkadscsnark_commitment<ppT> &commitment_previous,
-                                        const r1cs_gg_ppzkadscsnark_label<ppT> &iteration)
+bool r1cs_gg_ppzkadscsnark_dv_verifier_strong_IC(const r1cs_gg_ppzkadscsnark_dv_verification_key<ppT> &vk,
+                                        const r1cs_gg_ppzkadscsnark_dv_primary_input<ppT> &primary_input,
+                                        const r1cs_gg_ppzkadscsnark_dv_proof<ppT> &proof,
+                                        const r1cs_gg_ppzkadscsnark_dv_commitment<ppT> &commitment,
+                                        const r1cs_gg_ppzkadscsnark_dv_commitment<ppT> &commitment_previous,
+                                        const r1cs_gg_ppzkadscsnark_dv_label<ppT> &iteration)
 {
-    libff::enter_block("Call to r1cs_gg_ppzkadscsnark_verifier_strong_IC");
-    r1cs_gg_ppzkadscsnark_processed_verification_key<ppT> pvk = r1cs_gg_ppzkadscsnark_verifier_process_vk<ppT>(vk);
-    bool result = r1cs_gg_ppzkadscsnark_online_verifier_strong_IC<ppT>(pvk, primary_input, proof,
+    libff::enter_block("Call to r1cs_gg_ppzkadscsnark_dv_verifier_strong_IC");
+    r1cs_gg_ppzkadscsnark_dv_processed_verification_key<ppT> pvk = r1cs_gg_ppzkadscsnark_dv_verifier_process_vk<ppT>(vk);
+    bool result = r1cs_gg_ppzkadscsnark_dv_online_verifier_strong_IC<ppT>(pvk, primary_input, proof,
                                                                             commitment, commitment_previous, iteration);
-    libff::leave_block("Call to r1cs_gg_ppzkadscsnark_verifier_strong_IC");
+    libff::leave_block("Call to r1cs_gg_ppzkadscsnark_dv_verifier_strong_IC");
     return result;
 }
 
 
 } // libsnark
-#endif // R1CS_GG_PPZKADSCSNARK_TCC_
+#endif // R1CS_GG_PPZKADSCSNARK_DV_TCC_

@@ -40,6 +40,11 @@ namespace libsnark {
             return size_in_bytes() * 8;
         }
 
+        bool is_well_formed() const
+        {
+            return (!sig_bytes.empty());
+        }
+
         bool operator==(const signature_eddsa_signature &other) const;
         friend std::ostream& operator<< (std::ostream &out, const signature_eddsa_signature &signature);
         friend std::istream& operator>> (std::istream &in, signature_eddsa_signature &signature);

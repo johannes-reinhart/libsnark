@@ -81,6 +81,12 @@ option(
   ON
 )
 
+option(
+  SIGNATURE_SNARKFRIENDLY
+  "Use Snark-friendly signature scheme for adsc-snark"
+  OFF
+)
+
 set(
   OPT_FLAGS
   ""
@@ -225,6 +231,12 @@ endif()
 
 if("${USE_ASM}")
   add_definitions(-DUSE_ASM)
+endif()
+
+if("${SIGNATURE_SNARKFRIENDLY}")
+  add_definitions(
+          -DSIGNATURE_SNARKFRIENDLY
+  )
 endif()
 
 if("${USE_LINKED_LIBRARIES}")

@@ -2,38 +2,38 @@
 *****************************************************************************
 
 Declaration of interfaces for a ppZKADSCSNARK for R1CS with a security proof
-in the generic group (GG) model.
+in the generic group (GG) model with a designated verifier
 
 *****************************************************************************/
 
-#ifndef R1CS_GG_PPZKADSCSNARK_HPP_
-#define R1CS_GG_PPZKADSCSNARK_HPP_
+#ifndef R1CS_GG_PPZKADSCSNARK_DV_HPP_
+#define R1CS_GG_PPZKADSCSNARK_DV_HPP_
 
 #include <libff/algebra/curves/public_params.hpp>
 
 #include <libsnark/common/data_structures/accumulation_vector.hpp>
 #include <libsnark/knowledge_commitment/knowledge_commitment.hpp>
-#include <libsnark/zk_proof_systems/ppadscsnark/r1cs_gg_ppzkadscsnark/r1cs_gg_ppzkadscsnark_params.hpp>
-#include <libsnark/common/crypto/signature/eddsa.hpp>
+#include <libsnark/zk_proof_systems/ppadscsnark/r1cs_gg_ppzkadscsnark_dv/r1cs_gg_ppzkadscsnark_dv_params.hpp>
+#include <libsnark/common/crypto/mac/hmac.hpp>
 
 namespace libsnark {
 
 /******************************** Proving key ********************************/
 
 template<typename ppT>
-class r1cs_gg_ppzkadscsnark_proving_key;
+class r1cs_gg_ppzkadscsnark_dv_proving_key;
 
 template<typename ppT>
-std::ostream& operator<<(std::ostream &out, const r1cs_gg_ppzkadscsnark_proving_key<ppT> &pk);
+std::ostream& operator<<(std::ostream &out, const r1cs_gg_ppzkadscsnark_dv_proving_key<ppT> &pk);
 
 template<typename ppT>
-std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_proving_key<ppT> &pk);
+std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_dv_proving_key<ppT> &pk);
 
 /**
  * A proving key for the R1CS GG-ppZKADSCSNARK.
  */
 template<typename ppT>
-class r1cs_gg_ppzkadscsnark_proving_key {
+class r1cs_gg_ppzkadscsnark_dv_proving_key {
 public:
     libff::G1<ppT> alpha_g1;
     libff::G1<ppT> beta_g1;
@@ -53,11 +53,11 @@ public:
     libff::G2<ppT> beta_g2;
     libff::G2<ppT> delta_g2;
 
-    r1cs_gg_ppzkadscsnark_proving_key() {};
-    r1cs_gg_ppzkadscsnark_proving_key<ppT>& operator=(const r1cs_gg_ppzkadscsnark_proving_key<ppT> &other) = default;
-    r1cs_gg_ppzkadscsnark_proving_key(const r1cs_gg_ppzkadscsnark_proving_key<ppT> &other) = default;
-    r1cs_gg_ppzkadscsnark_proving_key(r1cs_gg_ppzkadscsnark_proving_key<ppT> &&other) = default;
-    r1cs_gg_ppzkadscsnark_proving_key(libff::G1<ppT> &&alpha_g1,
+    r1cs_gg_ppzkadscsnark_dv_proving_key() {};
+    r1cs_gg_ppzkadscsnark_dv_proving_key<ppT>& operator=(const r1cs_gg_ppzkadscsnark_dv_proving_key<ppT> &other) = default;
+    r1cs_gg_ppzkadscsnark_dv_proving_key(const r1cs_gg_ppzkadscsnark_dv_proving_key<ppT> &other) = default;
+    r1cs_gg_ppzkadscsnark_dv_proving_key(r1cs_gg_ppzkadscsnark_dv_proving_key<ppT> &&other) = default;
+    r1cs_gg_ppzkadscsnark_dv_proving_key(libff::G1<ppT> &&alpha_g1,
                                       libff::G1<ppT> &&beta_g1,
                                       libff::G1<ppT> &&delta_g1,
                                       libff::G1<ppT> &&epsilon_g1,
@@ -146,68 +146,71 @@ public:
         libff::print_indent(); printf("* PK size in bits: %zu\n", this->size_in_bits());
     }
 
-    bool operator==(const r1cs_gg_ppzkadscsnark_proving_key<ppT> &other) const;
-    friend std::ostream& operator<< <ppT>(std::ostream &out, const r1cs_gg_ppzkadscsnark_proving_key<ppT> &pk);
-    friend std::istream& operator>> <ppT>(std::istream &in, r1cs_gg_ppzkadscsnark_proving_key<ppT> &pk);
+    bool operator==(const r1cs_gg_ppzkadscsnark_dv_proving_key<ppT> &other) const;
+    friend std::ostream& operator<< <ppT>(std::ostream &out, const r1cs_gg_ppzkadscsnark_dv_proving_key<ppT> &pk);
+    friend std::istream& operator>> <ppT>(std::istream &in, r1cs_gg_ppzkadscsnark_dv_proving_key<ppT> &pk);
 };
 
 
 /******************************* Verification key ****************************/
 
 template<typename ppT>
-class r1cs_gg_ppzkadscsnark_verification_key;
+class r1cs_gg_ppzkadscsnark_dv_verification_key;
 
 template<typename ppT>
-std::ostream& operator<<(std::ostream &out, const r1cs_gg_ppzkadscsnark_verification_key<ppT> &vk);
+std::ostream& operator<<(std::ostream &out, const r1cs_gg_ppzkadscsnark_dv_verification_key<ppT> &vk);
 
 template<typename ppT>
-std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_verification_key<ppT> &vk);
+std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_dv_verification_key<ppT> &vk);
 
 /**
- * A verification key for the R1CS GG-ppZKADSCSNARK.
- * The verification key is public, the prover is allowed to see it
+ * A verification key for the designated verifier R1CS GG-ppZKADSCSNARK.
+ * The verification key is private, the prover is not allowed to see it
  */
 template<typename ppT>
-class r1cs_gg_ppzkadscsnark_verification_key {
+class r1cs_gg_ppzkadscsnark_dv_verification_key {
 public:
-    libff::G2<ppT> gamma_g2;
-    libff::G2<ppT> delta_g2;
-    libff::G2<ppT> epsilon_g2;
-    libff::G2<ppT> eta_g2;
-    libff::G2<ppT> kappa_g2;
+    libff::G1<ppT> one_g1;
+    libff::G2<ppT> one_m_g2; // minus one
+    libff::Fr<ppT> delta;
+    libff::Fr<ppT> epsilon;
+    libff::Fr<ppT> eta;
+    libff::Fr<ppT> kappa;
 
-    accumulation_vector<libff::G1<ppT>> Pi_statement;
+    std::vector<libff::Fr<ppT>> Pi_statement;
 
     libff::GT<ppT> alpha_g1_beta_g2;
-    std::vector<r1cs_gg_ppzkadscsnark_signature_pubkey<ppT>> pubkeys;
-    r1cs_gg_ppzkadscsnark_verification_key() = default;
-    r1cs_gg_ppzkadscsnark_verification_key(
-                                         libff::G2<ppT> &&gamma_g2,
-                                         libff::G2<ppT> &&delta_g2,
-                                         libff::G2<ppT> &&epsilon_g2,
-                                         libff::G2<ppT> &&eta_g2,
-                                         libff::G2<ppT> &&kappa_g2,
-                                         accumulation_vector<libff::G1<ppT>> &&Pi_statement,
+    std::vector<r1cs_gg_ppzkadscsnark_dv_mac_key<ppT>> mac_keys;
+    r1cs_gg_ppzkadscsnark_dv_verification_key() = default;
+    r1cs_gg_ppzkadscsnark_dv_verification_key(
+                                         libff::G1<ppT> &&one_g1,
+                                         libff::G2<ppT> &&one_m_g2,
+                                         libff::Fr<ppT> delta,
+                                         libff::Fr<ppT> epsilon,
+                                         libff::Fr<ppT> eta,
+                                         libff::Fr<ppT> kappa,
+                                         std::vector<libff::Fr<ppT>> &&Pi_statement,
                                          libff::GT<ppT> &&alpha_g1_beta_g2,
-                                         std::vector<r1cs_gg_ppzkadscsnark_signature_pubkey<ppT>> &&pubkeys) :
-            gamma_g2(std::move(gamma_g2)),
-            delta_g2(std::move(delta_g2)),
-            epsilon_g2(std::move(epsilon_g2)),
-            eta_g2(std::move(eta_g2)),
-            kappa_g2(std::move(kappa_g2)),
+                                         std::vector<r1cs_gg_ppzkadscsnark_dv_mac_key<ppT>> &&mac_keys) :
+            one_g1(std::move(one_g1)),
+            one_m_g2(std::move(one_m_g2)),
+            delta(delta),
+            epsilon(epsilon),
+            eta(eta),
+            kappa(kappa),
             Pi_statement(std::move(Pi_statement)),
             alpha_g1_beta_g2(std::move(alpha_g1_beta_g2)),
-            pubkeys(std::move(pubkeys))
+            mac_keys(std::move(mac_keys))
     {};
 
     size_t G1_size() const
     {
-        return Pi_statement.size();
+        return 1;
     }
 
     size_t G2_size() const
     {
-        return 5;
+        return 1;
     }
 
     size_t GT_size() const
@@ -217,15 +220,15 @@ public:
 
     size_t Fr_size() const
     {
-        return 0;
+        return Pi_statement.size() + 4;
     }
 
     size_t pkey_size() const
     {
         size_t size = 0;
-        for (auto &pubkey: pubkeys)
+        for (auto &key: mac_keys)
         {
-            size += pubkey.size_in_bytes();
+            size += key.size_in_bytes();
         }
         return size;
     }
@@ -254,24 +257,24 @@ public:
         libff::print_indent(); printf("* VK size in bits: %zu\n", this->size_in_bits());
     }
 
-    bool operator==(const r1cs_gg_ppzkadscsnark_verification_key<ppT> &other) const;
-    friend std::ostream& operator<< <ppT>(std::ostream &out, const r1cs_gg_ppzkadscsnark_verification_key<ppT> &vk);
-    friend std::istream& operator>> <ppT>(std::istream &in, r1cs_gg_ppzkadscsnark_verification_key<ppT> &vk);
+    bool operator==(const r1cs_gg_ppzkadscsnark_dv_verification_key<ppT> &other) const;
+    friend std::ostream& operator<< <ppT>(std::ostream &out, const r1cs_gg_ppzkadscsnark_dv_verification_key<ppT> &vk);
+    friend std::istream& operator>> <ppT>(std::istream &in, r1cs_gg_ppzkadscsnark_dv_verification_key<ppT> &vk);
 
-    static r1cs_gg_ppzkadscsnark_verification_key<ppT> dummy_verification_key(size_t input_size, size_t signatures);
+    static r1cs_gg_ppzkadscsnark_dv_verification_key<ppT> dummy_verification_key(size_t input_size, size_t signatures);
 };
 
 
 /************************ Processed verification key *************************/
 
 template<typename ppT>
-class r1cs_gg_ppzkadscsnark_processed_verification_key;
+class r1cs_gg_ppzkadscsnark_dv_processed_verification_key;
 
 template<typename ppT>
-std::ostream& operator<<(std::ostream &out, const r1cs_gg_ppzkadscsnark_processed_verification_key<ppT> &pvk);
+std::ostream& operator<<(std::ostream &out, const r1cs_gg_ppzkadscsnark_dv_processed_verification_key<ppT> &pvk);
 
 template<typename ppT>
-std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_processed_verification_key<ppT> &pvk);
+std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_dv_processed_verification_key<ppT> &pvk);
 
 /**
  * A processed verification key for the R1CS GG-ppZKADSCSNARK.
@@ -281,34 +284,35 @@ std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_processed_verif
  * enables a faster verification time.
  */
 template<typename ppT>
-class r1cs_gg_ppzkadscsnark_processed_verification_key {
+class r1cs_gg_ppzkadscsnark_dv_processed_verification_key {
 public:
-    libff::G2_precomp<ppT> gamma_m_g2_precomp; // minus gamma
-    libff::G2_precomp<ppT> delta_g2_precomp;
-    libff::G2_precomp<ppT> epsilon_g2_precomp;
-    libff::G2_precomp<ppT> eta_g2_precomp;
-    libff::G2_precomp<ppT> kappa_g2_precomp;
+    libff::G1<ppT> one_g1;
+    libff::G2_precomp<ppT> one_m_g2_precomp; // minus one
+    libff::Fr<ppT> delta;
+    libff::Fr<ppT> epsilon;
+    libff::Fr<ppT> eta;
+    libff::Fr<ppT> kappa;
 
-    accumulation_vector<libff::G1<ppT>> Pi_statement;
+    std::vector<libff::Fr<ppT>> Pi_statement;
 
     libff::GT<ppT> alpha_g1_beta_g2;
-    std::vector<r1cs_gg_ppzkadscsnark_signature_pubkey<ppT>> pubkeys;
+    std::vector<r1cs_gg_ppzkadscsnark_dv_mac_key<ppT>> mac_keys;
 
-    bool operator==(const r1cs_gg_ppzkadscsnark_processed_verification_key &other) const;
-    friend std::ostream& operator<< <ppT>(std::ostream &out, const r1cs_gg_ppzkadscsnark_processed_verification_key<ppT> &pvk);
-    friend std::istream& operator>> <ppT>(std::istream &in, r1cs_gg_ppzkadscsnark_processed_verification_key<ppT> &pvk);
+    bool operator==(const r1cs_gg_ppzkadscsnark_dv_processed_verification_key &other) const;
+    friend std::ostream& operator<< <ppT>(std::ostream &out, const r1cs_gg_ppzkadscsnark_dv_processed_verification_key<ppT> &pvk);
+    friend std::istream& operator>> <ppT>(std::istream &in, r1cs_gg_ppzkadscsnark_dv_processed_verification_key<ppT> &pvk);
 };
 
 /******************************* Authentication key ****************************/
 
 template<typename ppT>
-class r1cs_gg_ppzkadscsnark_authentication_key;
+class r1cs_gg_ppzkadscsnark_dv_authentication_key;
 
 template<typename ppT>
-std::ostream& operator<<(std::ostream &out, const r1cs_gg_ppzkadscsnark_authentication_key<ppT> &ak);
+std::ostream& operator<<(std::ostream &out, const r1cs_gg_ppzkadscsnark_dv_authentication_key<ppT> &ak);
 
 template<typename ppT>
-std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_authentication_key<ppT> &ak);
+std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_dv_authentication_key<ppT> &ak);
 
 /**
 * An authentication key for the R1CS GG-ppZKADSCSNARK.
@@ -316,17 +320,17 @@ std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_authentication_
 * T_g1 and delta_g1 are public, the prover is allowed to see it
 */
 template<typename ppT>
-class r1cs_gg_ppzkadscsnark_authentication_key {
+class r1cs_gg_ppzkadscsnark_dv_authentication_key {
 public:
-    r1cs_gg_ppzkadscsnark_signature_privkey<ppT> privkey;
+    r1cs_gg_ppzkadscsnark_dv_mac_key<ppT> mac_key;
     libff::G1_vector<ppT> T_g1;
     libff::G1<ppT> delta_g1;
 
-    r1cs_gg_ppzkadscsnark_authentication_key() = default;
-    r1cs_gg_ppzkadscsnark_authentication_key( const r1cs_gg_ppzkadscsnark_signature_privkey<ppT> &privkey,
+    r1cs_gg_ppzkadscsnark_dv_authentication_key() = default;
+    r1cs_gg_ppzkadscsnark_dv_authentication_key( const r1cs_gg_ppzkadscsnark_dv_mac_key<ppT> &mac_key,
                                               const libff::G1_vector<ppT> &T_g1,
                                               const libff::G1<ppT> &delta_g1) :
-            privkey(privkey),
+            mac_key(mac_key),
             T_g1(T_g1),
             delta_g1(delta_g1)
     {};
@@ -353,7 +357,7 @@ public:
 
     size_t Pkey_size() const
     {
-        return privkey.size_in_bytes();
+        return mac_key.size_in_bytes();
     }
 
     size_t size_in_bits() const
@@ -380,7 +384,7 @@ public:
         libff::print_indent(); printf("* AK size in bits: %zu\n", this->size_in_bits());
     }
 
-    bool operator==(const r1cs_gg_ppzkadscsnark_authentication_key<ppT> &other) const;
+    bool operator==(const r1cs_gg_ppzkadscsnark_dv_authentication_key<ppT> &other) const;
 
 };
 
@@ -388,34 +392,34 @@ public:
 * Authenticated inputs for the R1CS GG-ppZKADSCSNARK.
 */
 template<typename ppT>
-class r1cs_gg_ppzkadscsnark_authenticated_input;
+class r1cs_gg_ppzkadscsnark_dv_authenticated_input;
 
 template<typename ppT>
-std::ostream& operator<<(std::ostream &out, const r1cs_gg_ppzkadscsnark_authenticated_input<ppT> &ai);
+std::ostream& operator<<(std::ostream &out, const r1cs_gg_ppzkadscsnark_dv_authenticated_input<ppT> &ai);
 
 template<typename ppT>
-std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_authenticated_input<ppT> &ai);
+std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_dv_authenticated_input<ppT> &ai);
 
 template<typename ppT>
-class  r1cs_gg_ppzkadscsnark_authenticated_input {
+class  r1cs_gg_ppzkadscsnark_dv_authenticated_input {
 public:
-    r1cs_gg_ppzkadscsnark_assignment<ppT> values;
+    r1cs_gg_ppzkadscsnark_dv_assignment<ppT> values;
     libff::G1<ppT> D_g1;
     libff::Fr<ppT> bD;
-    r1cs_gg_ppzkadscsnark_signature_signature<ppT> signature;
+    r1cs_gg_ppzkadscsnark_dv_mac<ppT> mac;
 
-    bool operator==(const r1cs_gg_ppzkadscsnark_authenticated_input<ppT> &other) const;
+    bool operator==(const r1cs_gg_ppzkadscsnark_dv_authenticated_input<ppT> &other) const;
 };
 
 /**
 * Prover state for the R1CS GG-ppZKADSCSNARK.
 */
 template<typename ppT>
-class  r1cs_gg_ppzkadscsnark_prover_state {
+class  r1cs_gg_ppzkadscsnark_dv_prover_state {
 public:
     libff::Fr<ppT> bE;
 
-    r1cs_gg_ppzkadscsnark_prover_state() :
+    r1cs_gg_ppzkadscsnark_dv_prover_state() :
         bE(libff::Fr<ppT>::zero())
     {}
 };
@@ -423,13 +427,13 @@ public:
 /*********************************** Proof ***********************************/
 
 template<typename ppT>
-class r1cs_gg_ppzkadscsnark_proof;
+class r1cs_gg_ppzkadscsnark_dv_proof;
 
 template<typename ppT>
-std::ostream& operator<<(std::ostream &out, const r1cs_gg_ppzkadscsnark_proof<ppT> &proof);
+std::ostream& operator<<(std::ostream &out, const r1cs_gg_ppzkadscsnark_dv_proof<ppT> &proof);
 
 template<typename ppT>
-std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_proof<ppT> &proof);
+std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_dv_proof<ppT> &proof);
 
 /**
  * A proof for the R1CS GG-ppZKADSCSNARK.
@@ -439,16 +443,16 @@ std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_proof<ppT> &pro
  * about the structure for statistics purposes.
  */
 template<typename ppT>
-class r1cs_gg_ppzkadscsnark_proof {
+class r1cs_gg_ppzkadscsnark_dv_proof {
 public:
     libff::G1<ppT> A_g1;
     libff::G1<ppT> C_g1;
     libff::G1_vector<ppT> D_g1_vec;
 
     libff::G2<ppT> B_g2;
-    std::vector<r1cs_gg_ppzkadscsnark_signature_signature<ppT>> signatures;
+    std::vector<r1cs_gg_ppzkadscsnark_dv_mac<ppT>> macs;
 
-    r1cs_gg_ppzkadscsnark_proof()
+    r1cs_gg_ppzkadscsnark_dv_proof()
     {
         // invalid proof with valid curve points
         this->A_g1 = libff::G1<ppT>::one();
@@ -457,16 +461,16 @@ public:
         this->B_g2 = libff::G2<ppT>::one();
     }
 
-    r1cs_gg_ppzkadscsnark_proof(libff::G1<ppT> &&A_g1,
+    r1cs_gg_ppzkadscsnark_dv_proof(libff::G1<ppT> &&A_g1,
                             libff::G1<ppT> &&C_g1,
                             libff::G1_vector<ppT> &&D_g1_vec,
                             libff::G2<ppT> &&B_g2,
-                            std::vector<r1cs_gg_ppzkadscsnark_signature_signature<ppT>> &&signatures) :
+                            std::vector<r1cs_gg_ppzkadscsnark_dv_mac<ppT>> &&macs) :
         A_g1(std::move(A_g1)),
         C_g1(std::move(C_g1)),
         D_g1_vec(std::move(D_g1_vec)),
         B_g2(std::move(B_g2)),
-        signatures(std::move(signatures))
+        macs(std::move(macs))
     {};
 
     size_t G1_size() const
@@ -482,9 +486,9 @@ public:
     size_t Sig_size() const
     {
         size_t result = 0;
-        for (auto &sig: signatures)
+        for (auto &mac: macs)
         {
-            result += sig.size_in_bytes();
+            result += mac.size_in_bytes();
         }
         return result;
     }
@@ -518,7 +522,7 @@ public:
             result = false;
         }
 
-        if (D_g1_vec.size() != signatures.size())
+        if (D_g1_vec.size() != macs.size())
         {
             result = false;
         }
@@ -531,9 +535,9 @@ public:
             }
         }
 
-        for (auto &sig: signatures)
+        for (auto &mac: macs)
         {
-            if (!sig.is_well_formed())
+            if (!mac.is_well_formed())
             {
                 result = false;
             }
@@ -541,9 +545,9 @@ public:
         return result;
     }
 
-    bool operator==(const r1cs_gg_ppzkadscsnark_proof<ppT> &other) const;
-    friend std::ostream& operator<< <ppT>(std::ostream &out, const r1cs_gg_ppzkadscsnark_proof<ppT> &proof);
-    friend std::istream& operator>> <ppT>(std::istream &in, r1cs_gg_ppzkadscsnark_proof<ppT> &proof);
+    bool operator==(const r1cs_gg_ppzkadscsnark_dv_proof<ppT> &other) const;
+    friend std::ostream& operator<< <ppT>(std::ostream &out, const r1cs_gg_ppzkadscsnark_dv_proof<ppT> &proof);
+    friend std::istream& operator>> <ppT>(std::istream &in, r1cs_gg_ppzkadscsnark_dv_proof<ppT> &proof);
 };
 
 /**
@@ -553,26 +557,26 @@ public:
  */
 
 template<typename ppT>
-class r1cs_gg_ppzkadscsnark_commitment;
+class r1cs_gg_ppzkadscsnark_dv_commitment;
 
 template<typename ppT>
-std::ostream& operator<<(std::ostream &out, const r1cs_gg_ppzkadscsnark_commitment<ppT> &c);
+std::ostream& operator<<(std::ostream &out, const r1cs_gg_ppzkadscsnark_dv_commitment<ppT> &c);
 
 template<typename ppT>
-std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_commitment<ppT> &c);
+std::istream& operator>>(std::istream &in, r1cs_gg_ppzkadscsnark_dv_commitment<ppT> &c);
 
 template<typename ppT>
-class r1cs_gg_ppzkadscsnark_commitment {
+class r1cs_gg_ppzkadscsnark_dv_commitment {
 public:
     libff::G1<ppT> E_g1;
 
-    r1cs_gg_ppzkadscsnark_commitment()
+    r1cs_gg_ppzkadscsnark_dv_commitment()
     {
         // invalid commitment with valid curve points
         this->E_g1 = libff::G1<ppT>::one();
     }
 
-    r1cs_gg_ppzkadscsnark_commitment(libff::G1<ppT> &&E_g1) :
+    r1cs_gg_ppzkadscsnark_dv_commitment(libff::G1<ppT> &&E_g1) :
         E_g1(std::move(E_g1))
     {};
 
@@ -608,9 +612,9 @@ public:
         return E_g1.is_well_formed();
     }
 
-    bool operator==(const r1cs_gg_ppzkadscsnark_commitment<ppT> &other) const;
-    friend std::ostream& operator<< <ppT>(std::ostream &out, const r1cs_gg_ppzkadscsnark_commitment<ppT> &c);
-    friend std::istream& operator>> <ppT>(std::istream &in, r1cs_gg_ppzkadscsnark_commitment<ppT> &c);
+    bool operator==(const r1cs_gg_ppzkadscsnark_dv_commitment<ppT> &other) const;
+    friend std::ostream& operator<< <ppT>(std::ostream &out, const r1cs_gg_ppzkadscsnark_dv_commitment<ppT> &c);
+    friend std::istream& operator>> <ppT>(std::istream &in, r1cs_gg_ppzkadscsnark_dv_commitment<ppT> &c);
 };
 
 /********************************** Key pair *********************************/
@@ -620,26 +624,26 @@ public:
  * and an authentication key
  */
 template<typename ppT>
-class r1cs_gg_ppzkadscsnark_keypair {
+class r1cs_gg_ppzkadscsnark_dv_keypair {
 public:
-    r1cs_gg_ppzkadscsnark_proving_key<ppT> pk;
-    r1cs_gg_ppzkadscsnark_verification_key<ppT> vk;
-    std::vector<r1cs_gg_ppzkadscsnark_authentication_key<ppT>> aks;
-    r1cs_gg_ppzkadscsnark_commitment<ppT> initial_commitment;
+    r1cs_gg_ppzkadscsnark_dv_proving_key<ppT> pk;
+    r1cs_gg_ppzkadscsnark_dv_verification_key<ppT> vk;
+    std::vector<r1cs_gg_ppzkadscsnark_dv_authentication_key<ppT>> aks;
+    r1cs_gg_ppzkadscsnark_dv_commitment<ppT> initial_commitment;
 
-    r1cs_gg_ppzkadscsnark_keypair() = default;
-    r1cs_gg_ppzkadscsnark_keypair(const r1cs_gg_ppzkadscsnark_keypair<ppT> &other) = default;
-    r1cs_gg_ppzkadscsnark_keypair(r1cs_gg_ppzkadscsnark_proving_key<ppT> &&pk,
-                                r1cs_gg_ppzkadscsnark_verification_key<ppT> &&vk,
-                                std::vector<r1cs_gg_ppzkadscsnark_authentication_key<ppT>> &&aks,
-                                r1cs_gg_ppzkadscsnark_commitment<ppT> &&initial_commitment) :
+    r1cs_gg_ppzkadscsnark_dv_keypair() = default;
+    r1cs_gg_ppzkadscsnark_dv_keypair(const r1cs_gg_ppzkadscsnark_dv_keypair<ppT> &other) = default;
+    r1cs_gg_ppzkadscsnark_dv_keypair(r1cs_gg_ppzkadscsnark_dv_proving_key<ppT> &&pk,
+                                r1cs_gg_ppzkadscsnark_dv_verification_key<ppT> &&vk,
+                                std::vector<r1cs_gg_ppzkadscsnark_dv_authentication_key<ppT>> &&aks,
+                                r1cs_gg_ppzkadscsnark_dv_commitment<ppT> &&initial_commitment) :
             pk(std::move(pk)),
             vk(std::move(vk)),
             aks(std::move(aks)),
             initial_commitment(std::move(initial_commitment))
     {}
 
-    r1cs_gg_ppzkadscsnark_keypair(r1cs_gg_ppzkadscsnark_keypair<ppT> &&other) = default;
+    r1cs_gg_ppzkadscsnark_dv_keypair(r1cs_gg_ppzkadscsnark_dv_keypair<ppT> &&other) = default;
 };
 
 /***************************** Main algorithms *******************************/
@@ -650,8 +654,8 @@ public:
  * Given a R1CS constraint system CS, this algorithm produces proving, verification and authentication keys for CS.
  */
 template<typename ppT>
-r1cs_gg_ppzkadscsnark_keypair<ppT> r1cs_gg_ppzkadscsnark_generator(const r1cs_gg_ppzkadscsnark_constraint_system<ppT> &r1cs,
-                                                               const r1cs_gg_ppzkadscsnark_assignment<ppT> &initial_state,
+r1cs_gg_ppzkadscsnark_dv_keypair<ppT> r1cs_gg_ppzkadscsnark_dv_generator(const r1cs_gg_ppzkadscsnark_dv_constraint_system<ppT> &r1cs,
+                                                               const r1cs_gg_ppzkadscsnark_dv_assignment<ppT> &initial_state,
                                                                std::vector<size_t> private_input_blocks=std::vector<size_t>());
 
 /**
@@ -660,7 +664,7 @@ r1cs_gg_ppzkadscsnark_keypair<ppT> r1cs_gg_ppzkadscsnark_generator(const r1cs_gg
  * Given a set of input values, this algorithm outputs the authenticated values
  */
 template<typename ppT>
-r1cs_gg_ppzkadscsnark_authenticated_input<ppT> r1cs_gg_ppzkadscsnark_authenticate(const r1cs_gg_ppzkadscsnark_authentication_key<ppT> &ak, const r1cs_gg_ppzkadscsnark_label<ppT> &label, const r1cs_gg_ppzkadscsnark_assignment<ppT> &input);
+r1cs_gg_ppzkadscsnark_dv_authenticated_input<ppT> r1cs_gg_ppzkadscsnark_dv_authenticate(const r1cs_gg_ppzkadscsnark_dv_authentication_key<ppT> &ak, const r1cs_gg_ppzkadscsnark_dv_label<ppT> &label, const r1cs_gg_ppzkadscsnark_dv_assignment<ppT> &input);
 
 /**
  * A prover algorithm for the R1CS GG-ppZKADSCSNARK.
@@ -671,15 +675,15 @@ r1cs_gg_ppzkadscsnark_authenticated_input<ppT> r1cs_gg_ppzkadscsnark_authenticat
  * Above, CS is the R1CS constraint system that was given as input to the generator algorithm.
  */
 template<typename ppT>
-std::pair<r1cs_gg_ppzkadscsnark_proof<ppT>, r1cs_gg_ppzkadscsnark_commitment<ppT>> r1cs_gg_ppzkadscsnark_prover(
-                              const r1cs_gg_ppzkadscsnark_proving_key<ppT> &pk,
-                              const r1cs_gg_ppzkadscsnark_constraint_system<ppT> &constraint_system,
-                              const r1cs_gg_ppzkadscsnark_primary_input<ppT> &primary_input,
-                              const std::vector<r1cs_gg_ppzkadscsnark_authenticated_input<ppT>> &authenticated_inputs,
-                              const r1cs_gg_ppzkadscsnark_assignment<ppT> &state_input,
-                              const r1cs_gg_ppzkadscsnark_assignment<ppT> &state_update_input,
-                              const r1cs_gg_ppzkadscsnark_assignment<ppT> &witness_input,
-                              r1cs_gg_ppzkadscsnark_prover_state<ppT> &prover_state);
+std::pair<r1cs_gg_ppzkadscsnark_dv_proof<ppT>, r1cs_gg_ppzkadscsnark_dv_commitment<ppT>> r1cs_gg_ppzkadscsnark_dv_prover(
+                              const r1cs_gg_ppzkadscsnark_dv_proving_key<ppT> &pk,
+                              const r1cs_gg_ppzkadscsnark_dv_constraint_system<ppT> &constraint_system,
+                              const r1cs_gg_ppzkadscsnark_dv_primary_input<ppT> &primary_input,
+                              const std::vector<r1cs_gg_ppzkadscsnark_dv_authenticated_input<ppT>> &authenticated_inputs,
+                              const r1cs_gg_ppzkadscsnark_dv_assignment<ppT> &state_input,
+                              const r1cs_gg_ppzkadscsnark_dv_assignment<ppT> &state_update_input,
+                              const r1cs_gg_ppzkadscsnark_dv_assignment<ppT> &witness_input,
+                              r1cs_gg_ppzkadscsnark_dv_prover_state<ppT> &prover_state);
 
 /*
   Below are four variants of verifier algorithm for the R1CS GG-ppZKADSCSNARK.
@@ -701,12 +705,12 @@ std::pair<r1cs_gg_ppzkadscsnark_proof<ppT>, r1cs_gg_ppzkadscsnark_commitment<ppT
  * (2) has weak input consistency.
  */
 template<typename ppT>
-bool r1cs_gg_ppzkadscsnark_verifier_weak_IC(const r1cs_gg_ppzkadscsnark_verification_key<ppT> &vk,
-                                        const r1cs_gg_ppzkadscsnark_primary_input<ppT> &primary_input,
-                                        const r1cs_gg_ppzkadscsnark_proof<ppT> &proof,
-                                        const r1cs_gg_ppzkadscsnark_commitment<ppT> &commitment,
-                                        const r1cs_gg_ppzkadscsnark_commitment<ppT> &commitment_previous,
-                                        const r1cs_gg_ppzkadscsnark_label<ppT> &iteration);
+bool r1cs_gg_ppzkadscsnark_dv_verifier_weak_IC(const r1cs_gg_ppzkadscsnark_dv_verification_key<ppT> &vk,
+                                        const r1cs_gg_ppzkadscsnark_dv_primary_input<ppT> &primary_input,
+                                        const r1cs_gg_ppzkadscsnark_dv_proof<ppT> &proof,
+                                        const r1cs_gg_ppzkadscsnark_dv_commitment<ppT> &commitment,
+                                        const r1cs_gg_ppzkadscsnark_dv_commitment<ppT> &commitment_previous,
+                                        const r1cs_gg_ppzkadscsnark_dv_label<ppT> &iteration);
 
 /**
  * A verifier algorithm for the R1CS GG-ppZKADSCSNARK that:
@@ -714,19 +718,19 @@ bool r1cs_gg_ppzkadscsnark_verifier_weak_IC(const r1cs_gg_ppzkadscsnark_verifica
  * (2) has strong input consistency.
  */
 template<typename ppT>
-bool r1cs_gg_ppzkadscsnark_verifier_strong_IC(const r1cs_gg_ppzkadscsnark_verification_key<ppT> &vk,
-                                        const r1cs_gg_ppzkadscsnark_primary_input<ppT> &primary_input,
-                                        const r1cs_gg_ppzkadscsnark_proof<ppT> &proof,
-                                        const r1cs_gg_ppzkadscsnark_commitment<ppT> &commitment,
-                                        const r1cs_gg_ppzkadscsnark_commitment<ppT> &commitment_previous,
-                                        const r1cs_gg_ppzkadscsnark_label<ppT> &iteration);
+bool r1cs_gg_ppzkadscsnark_dv_verifier_strong_IC(const r1cs_gg_ppzkadscsnark_dv_verification_key<ppT> &vk,
+                                        const r1cs_gg_ppzkadscsnark_dv_primary_input<ppT> &primary_input,
+                                        const r1cs_gg_ppzkadscsnark_dv_proof<ppT> &proof,
+                                        const r1cs_gg_ppzkadscsnark_dv_commitment<ppT> &commitment,
+                                        const r1cs_gg_ppzkadscsnark_dv_commitment<ppT> &commitment_previous,
+                                        const r1cs_gg_ppzkadscsnark_dv_label<ppT> &iteration);
 
 /**
  * Convert a (non-processed) verification key into a processed verification key.
  */
 template<typename ppT>
-r1cs_gg_ppzkadscsnark_processed_verification_key<ppT> r1cs_gg_ppzkadscsnark_verifier_process_vk(
-    const r1cs_gg_ppzkadscsnark_verification_key<ppT> &vk);
+r1cs_gg_ppzkadscsnark_dv_processed_verification_key<ppT> r1cs_gg_ppzkadscsnark_dv_verifier_process_vk(
+    const r1cs_gg_ppzkadscsnark_dv_verification_key<ppT> &vk);
 
 /**
  * A verifier algorithm for the R1CS GG-ppZKADSCSNARK that:
@@ -734,12 +738,12 @@ r1cs_gg_ppzkadscsnark_processed_verification_key<ppT> r1cs_gg_ppzkadscsnark_veri
  * (2) has weak input consistency.
  */
 template<typename ppT>
-bool r1cs_gg_ppzkadscsnark_online_verifier_weak_IC(const r1cs_gg_ppzkadscsnark_processed_verification_key<ppT> &pvk,
-                                               const r1cs_gg_ppzkadscsnark_primary_input<ppT> &input,
-                                               const r1cs_gg_ppzkadscsnark_proof<ppT> &proof,
-                                               const r1cs_gg_ppzkadscsnark_commitment<ppT> &commitment,
-                                               const r1cs_gg_ppzkadscsnark_commitment<ppT> &commitment_previous,
-                                               const r1cs_gg_ppzkadscsnark_label<ppT> &iteration);
+bool r1cs_gg_ppzkadscsnark_dv_online_verifier_weak_IC(const r1cs_gg_ppzkadscsnark_dv_processed_verification_key<ppT> &pvk,
+                                               const r1cs_gg_ppzkadscsnark_dv_primary_input<ppT> &input,
+                                               const r1cs_gg_ppzkadscsnark_dv_proof<ppT> &proof,
+                                               const r1cs_gg_ppzkadscsnark_dv_commitment<ppT> &commitment,
+                                               const r1cs_gg_ppzkadscsnark_dv_commitment<ppT> &commitment_previous,
+                                               const r1cs_gg_ppzkadscsnark_dv_label<ppT> &iteration);
 
 /**
  * A verifier algorithm for the R1CS GG-ppZKADSCSNARK that:
@@ -747,16 +751,16 @@ bool r1cs_gg_ppzkadscsnark_online_verifier_weak_IC(const r1cs_gg_ppzkadscsnark_p
  * (2) has strong input consistency.
  */
 template<typename ppT>
-bool r1cs_gg_ppzkadscsnark_online_verifier_strong_IC(const r1cs_gg_ppzkadscsnark_processed_verification_key<ppT> &pvk,
-                                                 const r1cs_gg_ppzkadscsnark_primary_input<ppT> &primary_input,
-                                                 const r1cs_gg_ppzkadscsnark_proof<ppT> &proof,
-                                                 const r1cs_gg_ppzkadscsnark_commitment<ppT> &commitment,
-                                                 const r1cs_gg_ppzkadscsnark_commitment<ppT> &commitment_previous,
-                                                 const r1cs_gg_ppzkadscsnark_label<ppT> &iteration);
+bool r1cs_gg_ppzkadscsnark_dv_online_verifier_strong_IC(const r1cs_gg_ppzkadscsnark_dv_processed_verification_key<ppT> &pvk,
+                                                 const r1cs_gg_ppzkadscsnark_dv_primary_input<ppT> &primary_input,
+                                                 const r1cs_gg_ppzkadscsnark_dv_proof<ppT> &proof,
+                                                 const r1cs_gg_ppzkadscsnark_dv_commitment<ppT> &commitment,
+                                                 const r1cs_gg_ppzkadscsnark_dv_commitment<ppT> &commitment_previous,
+                                                 const r1cs_gg_ppzkadscsnark_dv_label<ppT> &iteration);
 
 
 } // libsnark
 
-#include <libsnark/zk_proof_systems/ppadscsnark/r1cs_gg_ppzkadscsnark/r1cs_gg_ppzkadscsnark.tcc>
+#include <libsnark/zk_proof_systems/ppadscsnark/r1cs_gg_ppzkadscsnark_dv/r1cs_gg_ppzkadscsnark_dv.tcc>
 
-#endif // R1CS_GG_PPZKADSCSNARK_HPP_
+#endif // R1CS_GG_PPZKADSCSNARK_DV_HPP_

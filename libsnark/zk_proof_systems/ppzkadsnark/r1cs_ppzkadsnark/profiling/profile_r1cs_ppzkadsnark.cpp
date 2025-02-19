@@ -112,13 +112,11 @@ adsnark_profile_t profile_r1cs_ppzkadsnark(
 
     //r1cs_example<libff::Fr<snark_pp<default_r1cs_ppzkadsnark_pp>>> example = generate_r1cs_example_with_field_input<libff::Fr<snark_pp<default_r1cs_ppzkadsnark_pp>>> (num_constraints, private_input_size);
     r1cs_adsc_example<libff::Fr<snark_pp<default_r1cs_ppzkadsnark_pp>>> example = generate_r1cs_adsc_example_with_field_input<libff::Fr<snark_pp<default_r1cs_ppzkadsnark_pp>>>(num_constraints, public_io_size, private_input_size, state_size, iterations);
-    // strengthen constraint system (this is not done in the original paper but necessary for security. See https://eprint.iacr.org/2015/437)
-    r1cs_constraint_system<libff::Fr<snark_pp<default_r1cs_ppzkadsnark_pp>>> constraint_system = r1cs_to_r1cs_adsc(std::move(example.constraint_system), private_input_size, state_size);
+    r1cs_constraint_system<libff::Fr<snark_pp<default_r1cs_ppzkadsnark_pp>>> constraint_system = example.constraint_system;
 
     constraint_system.primary_input_size = private_input_size; // The ADSNARK implementation uses primary input as private input and does not consider actual primary (public) input
     constraint_system.auxiliary_input_size -= private_input_size;
 
-    //profile_result.witness_size = example.constraint_system.num_variables() - private_input_size;
     profile_result.witness_size = constraint_system.num_variables() - public_io_size - private_input_size - 2*state_size;
 
     profile_result.circuit_num_constraints = constraint_system.num_constraints();
