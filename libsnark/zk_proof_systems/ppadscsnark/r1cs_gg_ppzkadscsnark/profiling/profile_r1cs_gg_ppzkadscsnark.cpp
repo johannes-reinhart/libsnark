@@ -190,7 +190,10 @@ int main(int argc, const char * argv[])
     int samples;
 
     PP::init_public_params();
+
+#ifdef SIGNATURE_SNARKFRIENDLY
     EC_Inner<PP>::init_public_params();
+#endif
 
 #ifndef DEBUG
     // We do not want to print profiling info at runtime, we will print results at the end

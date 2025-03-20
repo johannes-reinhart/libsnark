@@ -37,7 +37,9 @@ void test_r1cs_gg_ppzkadscsnark(size_t num_constraints,
 int main()
 {
     default_r1cs_gg_ppzkadscsnark_pp::init_public_params();
+#ifdef SIGNATURE_SNARKFRIENDLY
     EC_Inner<default_r1cs_gg_ppzkadscsnark_pp>::init_public_params();
+#endif
     libff::start_profiling();
 
     test_r1cs_gg_ppzkadscsnark<default_r1cs_gg_ppzkadscsnark_pp>(10, 1, 2, 2, 5);
