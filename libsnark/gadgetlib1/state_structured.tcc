@@ -27,7 +27,7 @@ void state_manager<FieldT>::update() {
 }
 
 template<typename FieldT>
-void state_manager<FieldT>::add_state(pb_state_structured<FieldT> &state) {
+void state_manager<FieldT>::add_state(const pb_state_structured<FieldT> &state) {
     states.push_back(state);
 }
 

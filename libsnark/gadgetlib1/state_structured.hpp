@@ -51,7 +51,7 @@ public:
 
     void update();
 
-    void add_state(pb_state_structured<FieldT> &state);
+    void add_state(const pb_state_structured<FieldT> &state);
 
     pb_state_structured<FieldT> allocate_state(FieldT initial_value=FieldT::zero());
 
