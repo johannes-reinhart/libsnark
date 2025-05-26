@@ -113,14 +113,14 @@ const std::vector<typename Parameters::Fr> poseidon_sponge(const Parameters &par
         for (size_t j = 0; j < rate; ++j) {
         	if (i*rate + j < n_inputs)
         	{
-        		state[j] += inputs[i*rate + j];
+        		state[j + param.c] += inputs[i*rate + j];
         	}
         }
 
         poseidon_permutation(param, state);
     }
 
-    std::vector<Fr> out(state.begin(), state.begin() + param.c);
+    std::vector<Fr> out(state.begin() + param.c, state.begin() + 2*param.c);
     return out;
 }
 

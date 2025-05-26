@@ -73,24 +73,7 @@ else()
   )
 endif()
 
-add_library(
-        snark_crypto
-
-        STATIC
-        common/crypto/digest/sha.cpp
-        common/crypto/signature/eddsa.cpp
-        common/crypto/mac/hmac.cpp
-)
-target_link_libraries(
-        snark_crypto
-        ${CRYPTO_LIBRARIES}
-)
-target_include_directories(
-        snark_crypto
-
-        PUBLIC
-        ${DEPENDS_DIR}/libff
-)
+add_subdirectory(common/crypto)
 
 install(
   DIRECTORY "" DESTINATION "include/libsnark"
@@ -424,45 +407,6 @@ target_link_libraries(
   common_routing_algorithms_test
 
   snark
-)
-
-add_executable(
-  common_crypto_digest_test
-  EXCLUDE_FROM_ALL
-
-  common/crypto/tests/test_digest.cpp
-)
-target_link_libraries(
-  common_crypto_digest_test
-
-  snark
-  snark_crypto
-)
-
-add_executable(
-    common_crypto_signature_test
-    EXCLUDE_FROM_ALL
-
-    common/crypto/tests/test_signature.cpp
-)
-target_link_libraries(
-    common_crypto_signature_test
-
-    snark
-    snark_crypto
-)
-
-add_executable(
-        common_crypto_mac_test
-        EXCLUDE_FROM_ALL
-
-        common/crypto/tests/test_mac.cpp
-)
-target_link_libraries(
-        common_crypto_mac_test
-
-        snark
-        snark_crypto
 )
 
 add_executable(
