@@ -64,7 +64,18 @@ void display_info(){
     std::cout << "Scalar field size " << libff::Fr<PP>::num_bits << " bits" << std::endl;
 }
 
+inline long long measure_nsec_time(bool walltime)
+{
+    if (walltime)
+    {
+        return libff::get_nsec_time();
+    } else {
+        return libff::get_nsec_cpu_time();
+    }
+}
+
 adscsnark_profile_t profile_r1cs_gg_ppzkadscsnark(
+        bool walltime,
         size_t num_constraints,
         size_t public_io_size,
         size_t private_input_size,
@@ -98,25 +109,25 @@ adscsnark_profile_t profile_r1cs_gg_ppzkadscsnark(
     profile_result.witness_size = constraint_system.num_variables() - public_io_size - private_input_size - 2*state_size;
     profile_result.circuit_num_constraints = constraint_system.num_constraints();
 
-    tstart = libff::get_nsec_cpu_time();
+    tstart = measure_nsec_time(walltime);
     r1cs_gg_ppzkadscsnark_keypair<PP> keypair = r1cs_gg_ppzkadscsnark_generator<PP>(constraint_system, example.state_assignment[0]);
-    tend = libff::get_nsec_cpu_time();
+    tend = measure_nsec_time(walltime);
     profile_result.generator_runtime = tend - tstart;
 
-    tstart = libff::get_nsec_cpu_time();
+    tstart = measure_nsec_time(walltime);
     r1cs_gg_ppzkadscsnark_processed_verification_key<PP> pvk = r1cs_gg_ppzkadscsnark_verifier_process_vk<PP>(keypair.vk);
-    tend = libff::get_nsec_cpu_time();
+    tend = measure_nsec_time(walltime);
     profile_result.verifier_preprocessing_runtime = tend - tstart;
 
     r1cs_gg_ppzkadscsnark_commitment<PP> previous_commitment = keypair.initial_commitment;
     r1cs_gg_ppzkadscsnark_prover_state<PP> prover_state;
     for(size_t t = 0; t < samples; ++t) {
-        tstart = libff::get_nsec_cpu_time();
+        tstart = measure_nsec_time(walltime);
         r1cs_gg_ppzkadscsnark_authenticated_input<PP> authenticated_input = r1cs_gg_ppzkadscsnark_authenticate(keypair.aks[0], t, example.private_input[t]);
-        tend = libff::get_nsec_cpu_time();
+        tend = measure_nsec_time(walltime);
         profile_measurements[t].authentication_runtime = tend - tstart;
 
-        tstart = libff::get_nsec_cpu_time();
+        tstart = measure_nsec_time(walltime);
         std::pair<r1cs_gg_ppzkadscsnark_proof<PP>, r1cs_gg_ppzkadscsnark_commitment<PP>> proof
                                             = r1cs_gg_ppzkadscsnark_prover<PP>(keypair.pk,
                                                                                constraint_system,
@@ -126,17 +137,17 @@ adscsnark_profile_t profile_r1cs_gg_ppzkadscsnark(
                                                                                example.state_assignment[t+1],
                                                                                example.witness_assignment[t],
                                                                                prover_state);
-        tend = libff::get_nsec_cpu_time();
+        tend = measure_nsec_time(walltime);
         profile_measurements[t].prover_runtime = tend - tstart;
 
         if(t == 0){
             profile_result.proof_size = get_serialized_size(proof.first) + get_serialized_size(proof.second);
         }
 
-        tstart = libff::get_nsec_cpu_time();
+        tstart = measure_nsec_time(walltime);
         bool verified = r1cs_gg_ppzkadscsnark_online_verifier_strong_IC<PP>(pvk, example.primary_input[t], proof.first,
             proof.second, previous_commitment, t);
-        tend = libff::get_nsec_cpu_time();
+        tend = measure_nsec_time(walltime);
         profile_measurements[t].verifier_runtime = tend - tstart;
 
         previous_commitment = proof.second;
@@ -188,6 +199,7 @@ int main(int argc, const char * argv[])
     int num_constraints;
     int public_io_size;
     int samples;
+    bool walltime;
 
     PP::init_public_params();
 
@@ -209,6 +221,7 @@ int main(int argc, const char * argv[])
             ("help", "show help")
             ("info", "show compilation info")
             ("profile", "run the profiler")
+            ("walltime", "measure wall-time instead of total cpu time")
             ("samples", po::value<int>(&samples)->default_value(10), "number of samples for timing measurements")
             ("public-io,p", po::value<int>(&public_io_size)->default_value(-1), "number of public inputs/outputs")
             ("constraints,c", po::value<int>(&num_constraints)->default_value(10), "2^x number of constraints")
@@ -229,6 +242,8 @@ int main(int argc, const char * argv[])
         display_info();
         return 1;
     }
+
+    walltime = vm.count("walltime") > 0;
 
     if (parse_range(private_inputs_range)){
         std::cout << "Arguments private-inputs invalid. Provide single number or range." << std::endl;
@@ -254,6 +269,13 @@ int main(int argc, const char * argv[])
         adscsnark_profile_t profile;
 
         libff::print_header("Profiling");
+        if (walltime)
+        {
+            std::cout << "Measuring wall-time" << std::endl;
+        } else
+        {
+            std::cout << "Measuring cpu time" << std::endl;
+        }
         std::cout << "Num constraints: " << pow2(num_constraints) << " (2^" << num_constraints << ")" << std::endl;
         std::cout << "Public IO size: " << pow2(public_io_size) << " (2^" << public_io_size << ")" << std::endl;
         std::cout << "Security Parameter: " << libff::Fr<PP>::num_bits << std::endl;
@@ -265,7 +287,9 @@ int main(int argc, const char * argv[])
             for(int state_num = state_range[0];
                 state_num <= state_range[1];
                 state_num += state_range[2]) {
-                profile = profile_r1cs_gg_ppzkadscsnark(pow2(num_constraints),
+                profile = profile_r1cs_gg_ppzkadscsnark(
+                                                        walltime,
+                                                        pow2(num_constraints),
                                                       pow2(public_io_size),
                                                       pow2(private_inputs_num),
                                                       pow2(state_num),
